@@ -1,0 +1,519 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Emergencia activa | VidaLink</title>
+  <link rel="icon" type="image/png" href="RECURSOS/vidalink.png">
+  <link rel="stylesheet" href="CSS/styles.css">
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600&display=swap" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/css/bootstrap.min.css" rel="stylesheet">
+</head>
+<body>
+
+  <nav class="navbar navbar-compact">
+    <div class="container-fluid">
+      <a href="index.html" class="d-flex align-items-center gap-2" style="text-decoration: none;">
+        <img src="RECURSOS/logo.png" alt="VidaLink Logo" width="160" height="auto">
+      </a>
+      <div class="d-flex align-items-center gap-3 ms-auto">
+        <button type="button" class="btn btn-outline-secondary" onclick="window.location.href='index.html'">
+          ← Volver al inicio
+        </button>
+      </div>
+    </div>
+  </nav>
+
+  <main class="container py-5">
+    <section class="emergencia-hero d-flex align-items-center gap-3">
+      <div class="radar-container">
+        <div class="radar"></div>
+      </div>
+      <div>
+        <h2>Emergencia activa</h2>
+        <p>Hemos notificado a los voluntarios disponibles más cercanos. Mantente en un lugar seguro y sigue las instrucciones.</p>
+        <small id="tiempoActivo" class="text-muted d-block mt-2">Tiempo activo: —</small>
+      </div>
+    </section>
+
+    <div class="row g-3 mb-4">
+      <div class="col-12 col-md-6">
+        <div class="card shadow-sm">
+          <div class="card-body text-center">
+            <h6 class="fw-bold text-danger">Ubicación de emergencia</h6>
+            <p id="coords" class="mb-0 fw-bold fs-5 text-primary emergencia-coords">Obteniendo ubicación...</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="col-12 col-md-6 d-flex align-items-stretch">
+        <div class="card shadow-sm flex-fill">
+          <div class="card-body d-flex flex-column justify-content-center text-center">
+            <h6 class="fw-bold">Estado del voluntario</h6>
+            <p id="voluntarioStatus" class="mb-1 text-muted">Buscando un voluntario disponible…</p>
+            <div class="mt-2">
+              <span class="badge bg-warning text-dark">Buscando</span>
+              <span class="badge bg-light text-dark ms-2 chat-badge" id="volNombrePlaceholder">Sin asignar</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="emergencia-actions d-grid gap-3 mb-5">
+      <div class="d-flex gap-3 flex-column flex-sm-row">
+        <button class="btn btn-danger btn-lg fw-bold flex-fill" onclick="abrirGuia()">
+          Ver Guía de Primeros Auxilios
+        </button>
+
+        <button class="btn btn-success btn-lg fw-bold flex-fill" id="btnAbrirChat">
+          💬 Conversar con el voluntario
+        </button>
+      </div>
+
+      <div>
+        <button class="btn btn-outline-secondary btn-lg w-100" onclick="cancelarEmergencia()">
+          Cancelar Emergencia
+        </button>
+      </div>
+    </div>
+
+  </main>
+
+  <!-- MODAL GUÍA DE PRIMEROS AUXILIOS -->
+  <div class="modal fade" id="modalGuia" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title" id="tituloModal">Guías de Primeros Auxilios</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body" id="contenidoModal">
+          <!-- Se llena con JS -->
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL CHAT -->
+  <div class="modal fade" id="modalChat" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable">
+      <div class="modal-content">
+        <div class="modal-header bg-primary text-white">
+          <h5 class="modal-title" id="tituloChat">Chat con el voluntario</h5>
+          <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body" id="chatBody" style="height: 400px; overflow-y: auto;">
+          <div class="text-center text-muted py-5" id="sinMensajes">Esperando mensajes...</div>
+          <div id="typingIndicator" class="text-muted fst-italic ms-3 mb-2 d-none">Voluntario escribiendo...</div>
+        </div>
+        <div class="modal-footer">
+          <div class="input-group">
+            <input type="text" id="inputMensaje" class="form-control" placeholder="Escribe un mensaje..." autocomplete="off">
+            <button class="btn btn-primary" id="btnEnviar">Enviar</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- SONIDO DE NOTIFICACIÓN -->
+  <audio id="notificationSound" src="RECURSOS/noti.wav" preload="auto"></audio>
+
+  <!-- SCRIPT PRINCIPAL -->
+  <script type="module">
+    import { showCustomAlert, showCustomConfirm } from './SCRIPT/utils.js';
+
+    document.addEventListener("DOMContentLoaded", () => {
+      let data = JSON.parse(localStorage.getItem('emergenciaActiva'));
+
+      if (!data || !data.alertaId) {
+        showCustomAlert('Error', 'No se encontró datos de emergencia activa.', [
+          { text: 'Volver al inicio', className: 'btn btn-secondary px-4', action: () => window.location.href = 'index.html' }
+        ]);
+        return;
+      }
+
+      // Mostrar coordenadas
+      document.getElementById('coords').innerText = `Lat: ${data.lat.toFixed(6)}, Lng: ${data.lon.toFixed(6)}`;
+
+      // Contador de tiempo activo
+      const tiempoEl = document.getElementById('tiempoActivo');
+      setInterval(() => {
+        const mins = Math.floor((Date.now() - data.timestamp) / 60000);
+        const secs = Math.floor(((Date.now() - data.timestamp) % 60000) / 1000);
+        tiempoEl.innerText = `Activada hace ${mins}m ${secs}s`;
+      }, 1000);
+    });
+
+    // Tus funciones de guía de primeros auxilios (mantén tu código original aquí)
+    const guias = {
+      paro: [
+        "Verifica si la persona responde (llama y sacude suavemente)",
+        "Si no responde, pide ayuda y llama al 123 o emergencias",
+        "Coloca a la persona boca arriba en superficie firme",
+        "Inicia compresiones torácicas: 100-120 por minuto, profundidad 5-6 cm",
+        "Si estás capacitado, combina con ventilaciones (30:2)",
+        "Continúa hasta que llegue ayuda profesional o use DEA"
+      ],
+      asfixia: [
+        "Pregunta: ¿Puedes hablar o toser?",
+        "Si no responde, da 5 golpes fuertes entre los omóplatos",
+        "Si no funciona, realiza 5 compresiones abdominales (maniobra de Heimlich)",
+        "Alterna golpes y compresiones hasta liberar la vía aérea",
+        "Si pierde el conocimiento, inicia RCP"
+      ],
+      hemorragia: [
+        "Aplica presión directa firme sobre la herida con tela limpia",
+        "Eleva la extremidad afectada por encima del corazón si es posible",
+        "No retires objetos incrustados, presiona alrededor",
+        "Si la sangre empapa la tela, coloca otra encima sin quitar la primera",
+        "Mantén presión hasta llegada de ayuda médica"
+      ],
+      otra: [
+        "Mantén la calma y evalúa la seguridad de la escena",
+        "Llama inmediatamente al 123 o emergencias locales",
+        "No muevas a la persona si sospechas lesión en columna",
+        "Proporciona confort y monitorea signos vitales",
+        "Sigue instrucciones del operador de emergencias"
+      ]
+    };
+
+    let tipoActual = "";
+    let pasoActual = 0;
+
+    function abrirGuia() {
+      document.getElementById("tituloModal").innerText = "Selecciona tipo de emergencia";
+      document.getElementById("contenidoModal").innerHTML = `
+        <div class="row g-3 text-center">
+          <div class="col-6">
+            <button class="btn btn-outline-danger w-100 p-4 fs-5" onclick="iniciarPasos('paro')">
+              🫀 Paro Cardíaco
+            </button>
+          </div>
+          <div class="col-6">
+            <button class="btn btn-outline-primary w-100 p-4 fs-5" onclick="iniciarPasos('asfixia')">
+              😮‍💨 Asfixia
+            </button>
+          </div>
+          <div class="col-6">
+            <button class="btn btn-outline-warning w-100 p-4 fs-5" onclick="iniciarPasos('hemorragia')">
+              🩸 Hemorragia Grave
+            </button>
+          </div>
+          <div class="col-6">
+            <button class="btn btn-outline-secondary w-100 p-4 fs-5" onclick="iniciarPasos('otra')">
+              ⚠️ Otra Emergencia
+            </button>
+          </div>
+        </div>
+      `;
+
+      new bootstrap.Modal(document.getElementById('modalGuia')).show();
+    }
+
+    function iniciarPasos(tipo) {
+      tipoActual = tipo;
+      pasoActual = 0;
+      renderPaso();
+    }
+
+    function renderPaso() {
+      const pasos = guias[tipoActual];
+
+      document.getElementById("tituloModal").innerText = 
+        tipoActual.charAt(0).toUpperCase() + tipoActual.slice(1) + " - Paso " + (pasoActual + 1) + "/" + pasos.length;
+
+      document.getElementById("contenidoModal").innerHTML = `
+        <div class="text-center">
+          <div class="alert alert-danger py-4 mb-4">
+            <h4 class="alert-heading">Paso ${pasoActual + 1}</h4>
+            <p class="fs-5 fw-bold">${pasos[pasoActual]}</p>
+          </div>
+
+          <div class="d-flex justify-content-between align-items-center">
+            <button class="btn btn-outline-secondary" onclick="abrirGuia()">
+              Cambiar tipo
+            </button>
+
+            <div>
+              <button class="btn btn-secondary me-2" onclick="anteriorPaso()" ${pasoActual === 0 ? "disabled" : ""}>
+                ← Anterior
+              </button>
+              <button class="btn btn-danger" onclick="siguientePaso()" ${pasoActual === pasos.length - 1 ? "disabled" : ""}>
+                Siguiente →
+              </button>
+            </div>
+          </div>
+        </div>
+      `;
+    }
+
+    function siguientePaso() {
+      if (pasoActual < guias[tipoActual].length - 1) {
+        pasoActual++;
+        renderPaso();
+      }
+    }
+
+    function anteriorPaso() {
+      if (pasoActual > 0) {
+        pasoActual--;
+        renderPaso();
+      }
+    }
+
+    function cancelarEmergencia() {
+      showCustomConfirm('Cancelar emergencia', '¿Estás seguro de cancelar la emergencia? Esto notificará a los voluntarios.', () => {
+        // La lógica real está en el script type="module" de abajo
+        window.dispatchEvent(new CustomEvent('cancelarEmergenciaManual'));
+      });
+    }
+    // Exponer para que onclick en HTML funcione (scripts type=module no exportan globales)
+    window.cancelarEmergencia = cancelarEmergencia;
+    // Exponer funciones de la guía para los botones inline dentro del modal
+    window.abrirGuia = abrirGuia;
+    window.iniciarPasos = iniciarPasos;
+    window.siguientePaso = siguientePaso;
+    window.anteriorPaso = anteriorPaso;
+    window.renderPaso = renderPaso;
+  </script>
+
+  <!-- SCRIPT DEL CHAT + NOTIFICACIÓN DE ACEPTACIÓN -->
+  <script type="module">
+    import { db } from './SCRIPT/firebase-init.js';
+    import { collection, addDoc, onSnapshot, orderBy, query, serverTimestamp, doc, updateDoc, deleteField } from "https://www.gstatic.com/firebasejs/12.7.0/firebase-firestore.js";
+    import { showCustomAlert, showCustomConfirm } from './SCRIPT/utils.js';
+
+    let alertaIdActual = null;
+    let unsubscribeChat = null;
+    let unsubscribeTyping = null;
+    let unsubscribeAceptacion = null;
+    let typingTimeout = null;
+    const notificationSound = document.getElementById('notificationSound');
+
+    document.addEventListener('DOMContentLoaded', () => {
+      const data = JSON.parse(localStorage.getItem('emergenciaActiva'));
+      if (data && data.alertaId) {
+        alertaIdActual = data.alertaId;
+
+        document.getElementById('btnAbrirChat').onclick = () => {
+          document.getElementById('tituloChat').innerText = "Chat con el voluntario";
+          const modal = new bootstrap.Modal(document.getElementById('modalChat'));
+          modal.show();
+          cargarMensajes();
+          escucharTyping();
+        };
+
+        // Escuchar aceptación del voluntario
+        escucharAceptacion();
+      }
+    });
+
+    function cargarMensajes() {
+      if (!alertaIdActual) return;
+      if (unsubscribeChat) unsubscribeChat();
+
+      let lastMessageCount = 0;
+
+      const q = query(collection(db, "alertas", alertaIdActual, "mensajes"), orderBy("timestamp"));
+
+      unsubscribeChat = onSnapshot(q, (snapshot) => {
+        const chatBody = document.getElementById('chatBody');
+          if (snapshot.empty) {
+            chatBody.innerHTML = '<div class="text-center chat-empty" id="sinMensajes">Esperando mensajes...</div>';
+          } else {
+            chatBody.innerHTML = '';
+            snapshot.forEach((docSnap) => {
+              const msg = docSnap.data();
+              const wrapper = document.createElement('div');
+              wrapper.className = 'chat-message ' + (msg.esVoluntario ? 'vol' : 'me');
+
+              const bubble = document.createElement('div');
+              bubble.className = 'bubble ' + (msg.esVoluntario ? 'bubble-vol' : 'bubble-me');
+
+              const who = document.createElement('small');
+              who.className = 'meta';
+              who.textContent = msg.esVoluntario ? 'Voluntario' : 'Tú';
+
+              const text = document.createElement('p');
+              text.className = 'mb-0';
+              text.textContent = msg.texto;
+
+              const time = document.createElement('small');
+              time.className = 'chat-time';
+              time.textContent = msg.timestamp?.toDate?.()?.toLocaleTimeString('es-CO') || 'Enviando...';
+
+              bubble.appendChild(who);
+              bubble.appendChild(text);
+              bubble.appendChild(time);
+
+              wrapper.appendChild(bubble);
+              chatBody.appendChild(wrapper);
+            });
+          }
+
+        chatBody.scrollTop = chatBody.scrollHeight;
+
+        // Sonido al recibir mensaje del voluntario
+        if (snapshot.size > lastMessageCount) {
+          const newMsg = snapshot.docs[snapshot.size - 1].data();
+          if (newMsg.esVoluntario) {
+            notificationSound.play().catch(() => {});
+          }
+          lastMessageCount = snapshot.size;
+        }
+      });
+    }
+
+    function escucharTyping() {
+      if (!alertaIdActual) return;
+      if (unsubscribeTyping) unsubscribeTyping();
+
+      const alertaRef = doc(db, "alertas", alertaIdActual);
+
+      unsubscribeTyping = onSnapshot(alertaRef, (snap) => {
+        const data = snap.data() || {};
+        const indicator = document.getElementById('typingIndicator');
+        if (data.isTypingVoluntario) {
+          indicator.classList.remove('d-none');
+        } else {
+          indicator.classList.add('d-none');
+        }
+      });
+    }
+
+    function escucharAceptacion() {
+      if (!alertaIdActual) return;
+      const alertaRef = doc(db, "alertas", alertaIdActual);
+
+      unsubscribeAceptacion = onSnapshot(alertaRef, (snap) => {
+        const data = snap.data();
+        if (data?.estado === "asignada" && data.voluntarioNombre) {
+          // Actualizar localStorage con el nombre del voluntario
+          let emergenciaData = JSON.parse(localStorage.getItem('emergenciaActiva'));
+          emergenciaData.voluntarioNombre = data.voluntarioNombre;
+          localStorage.setItem('emergenciaActiva', JSON.stringify(emergenciaData));
+
+          // Reproducir sonido y alerta solo la primera vez
+          if (!localStorage.getItem('alertaAceptadaNotificada_' + alertaIdActual)) {
+            notificationSound.play().catch(() => {});
+            
+            // Mostrar modal de éxito usando utilitario
+            const nombre = data.voluntarioNombre || 'Voluntario';
+            showCustomAlert('¡Excelente!', `Un voluntario aceptó tu alerta!\nNombre: ${nombre}\nEstá en camino para ayudarte.`, [
+              { text: 'Continuar', className: 'btn btn-success px-4', action: () => window.location.href = 'Voluntario-encontrado.html' }
+            ]);
+            localStorage.setItem('alertaAceptadaNotificada_' + alertaIdActual, 'true');
+          } else {
+            window.location.href = 'Voluntario-encontrado.html';
+          }
+        }
+      });
+    }
+
+    // Indicador de escritura del paciente
+    document.getElementById('inputMensaje')?.addEventListener('input', () => {
+      if (!alertaIdActual) return;
+      clearTimeout(typingTimeout);
+      updateDoc(doc(db, "alertas", alertaIdActual), { isTypingPaciente: true });
+      typingTimeout = setTimeout(() => {
+        updateDoc(doc(db, "alertas", alertaIdActual), { isTypingPaciente: deleteField() });
+      }, 3000);
+    });
+
+    // Enviar mensaje
+    document.getElementById('btnEnviar')?.addEventListener('click', enviarMensaje);
+    document.getElementById('inputMensaje')?.addEventListener('keypress', (e) => {
+      if (e.key === 'Enter') enviarMensaje();
+    });
+
+    async function enviarMensaje() {
+      const input = document.getElementById('inputMensaje');
+      const texto = input.value.trim();
+      if (!texto || !alertaIdActual) return;
+
+      try {
+        await addDoc(collection(db, "alertas", alertaIdActual, "mensajes"), {
+          texto,
+          esVoluntario: false,
+          timestamp: serverTimestamp()
+        });
+        input.value = '';
+        updateDoc(doc(db, "alertas", alertaIdActual), { isTypingPaciente: deleteField() });
+      } catch (error) {
+        const modal = document.createElement('div');
+        modal.className = 'modal fade show';
+        modal.style.display = 'block';
+        modal.innerHTML = `
+          <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+              <div class="modal-header border-0 pb-0">
+                <h5 class="modal-title fw-bold text-danger">Error</h5>
+              </div>
+              <div class="modal-body pt-2 text-center">
+                <p class="text-dark mb-0 fs-5">Error al enviar mensaje</p>
+              </div>
+              <div class="modal-footer border-0 justify-content-center">
+                <button type="button" class="btn btn-secondary px-4" data-bs-dismiss="modal">Cerrar</button>
+              </div>
+            </div>
+          </div>
+        `;
+        document.body.appendChild(modal);
+        console.error(error);
+      }
+    }
+
+    window.addEventListener('cancelarEmergenciaManual', async () => {
+      const data = JSON.parse(localStorage.getItem('emergenciaActiva'));
+      if (data && data.alertaId) {
+        try {
+          await deleteDoc(doc(db, "alertas", data.alertaId));
+        } catch (error) {
+          console.error("Error al eliminar alerta:", error);
+        }
+      }
+      localStorage.removeItem('emergenciaActiva');
+      
+      // Crear modal de éxito
+      const modal = document.createElement('div');
+      modal.className = 'modal fade show';
+      modal.style.display = 'block';
+      modal.innerHTML = `
+        <div class="modal-dialog modal-dialog-centered">
+          <div class="modal-content">
+            <div class="modal-header border-0 pb-0">
+              <h5 class="modal-title fw-bold text-success">Emergencia cancelada</h5>
+            </div>
+            <div class="modal-body pt-2 text-center">
+              <p class="text-dark mb-0 fs-5">La emergencia ha sido cancelada correctamente.</p>
+            </div>
+            <div class="modal-footer border-0 justify-content-center">
+              <button type="button" class="btn btn-secondary px-4" onclick="window.location.href='index.html'">Ir al inicio</button>
+            </div>
+          </div>
+        </div>
+      `;
+      document.body.appendChild(modal);
+    });
+</script>
+
+<!-- Asegúrate de importar deleteDoc en el script del chat -->
+<script type="module">
+  import { db } from './SCRIPT/firebase-init.js';
+  import { 
+    collection, addDoc, onSnapshot, orderBy, query, serverTimestamp, 
+    doc, updateDoc, deleteField, deleteDoc  // ← AÑADIR deleteDoc AQUÍ
+  } from "https://www.gstatic.com/firebasejs/12.7.0/firebase-firestore.js";
+  
+  </script>
+
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/js/bootstrap.bundle.min.js"></script>
+
+  <footer class="site-footer">
+    <p>No reemplazamos ambulancias, las complementamos con ayuda ciudadana.</p>
+    <p>&copy; 2025 VidaLink. All rights reserved.</p>
+  </footer>
+</body>
+</html>

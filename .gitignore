@@ -1,0 +1,9 @@
+# Firebase (CLAVES PRIVADAS)
+SCRIPT/firebase-init.js
+
+# Sistema
+.DS_Store
+Thumbs.db
+
+# Node (por si luego usas npm)
+node_modules/

@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Completar Perfil - VidaLink</title>
+  <link rel="icon" type="image/png" href="RECURSOS/vidalink.png">
+  <link rel="stylesheet" href="CSS/styles.css">
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/css/bootstrap.min.css" rel="stylesheet">
+</head>
+<body class="page-transition">
+  <!-- LOADER GLOBAL -->
+  <div id="vidalink-loader">
+    <div class="loader-spinner"></div>
+    <img src="RECURSOS/vidalink.png" width="80" alt="VidaLink">
+  </div>
+
+  <div class="auth-page-bg">
+    <div class="auth-container" style="max-width: 700px;">
+      <div class="auth-card">
+        <div class="text-center mb-4">
+          <img src="RECURSOS/vidalink.png" alt="VidaLink Logo" class="auth-logo">
+          <h2 class="auth-title">¡Bienvenido a VidaLink!</h2>
+          <p class="auth-subtitle">Completa tu perfil para activar todas las funcionalidades</p>
+        </div>
+
+        <form id="formCompletarPerfil">
+          <div class="row g-3">
+            <!-- Email (solo lectura) -->
+            <div class="col-12">
+              <label for="email" class="form-label-auth">Correo electrónico</label>
+              <input type="email" class="form-control form-control-auth" id="email" readonly>
+            </div>
+
+            <!-- Primer Nombre -->
+            <div class="col-md-6">
+              <label for="primerNombre" class="form-label-auth">Primer nombre <span class="text-danger">*</span></label>
+              <input type="text" class="form-control form-control-auth" id="primerNombre" placeholder="Ej: Juan" required>
+            </div>
+
+            <!-- Segundo Nombre -->
+            <div class="col-md-6">
+              <label for="segundoNombre" class="form-label-auth">Segundo nombre</label>
+              <input type="text" class="form-control form-control-auth" id="segundoNombre" placeholder="Opcional">
+            </div>
+
+            <!-- Primer Apellido -->
+            <div class="col-md-6">
+              <label for="primerApellido" class="form-label-auth">Primer apellido <span class="text-danger">*</span></label>
+              <input type="text" class="form-control form-control-auth" id="primerApellido" placeholder="Ej: Pérez" required>
+            </div>
+
+            <!-- Segundo Apellido -->
+            <div class="col-md-6">
+              <label for="segundoApellido" class="form-label-auth">Segundo apellido</label>
+              <input type="text" class="form-control form-control-auth" id="segundoApellido" placeholder="Opcional">
+            </div>
+
+            <!-- Celular -->
+            <div class="col-12">
+              <label for="celular" class="form-label-auth">Celular <span class="text-danger">*</span></label>
+              <input type="tel" class="form-control form-control-auth" id="celular" placeholder="300 123 4567" required>
+            </div>
+
+            <!-- Checkbox Voluntario -->
+            <div class="col-12">
+              <div class="form-check custom-check py-2">
+                <input class="form-check-input" type="checkbox" id="esVoluntario">
+                <label class="form-check-label" for="esVoluntario">
+                  Quiero ser voluntario y ayudar en emergencias
+                </label>
+              </div>
+            </div>
+
+            <!-- Botón -->
+            <div class="col-12 mt-3">
+              <button type="submit" class="btn btn-danger btn-auth w-100" id="btnCompletarPerfil">
+                <span class="spinner-border spinner-border-sm d-none me-2" role="status" id="spinner"></span>
+                Completar Perfil
+              </button>
+            </div>
+
+            <!-- Cancelar -->
+            <div class="col-12 text-center">
+              <a href="#" id="btnCancelar" class="back-link">← Cancelar</a>
+            </div>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <script type="module">
+    import { auth } from './SCRIPT/firebase-init.js';
+    import { completarPerfilGoogle } from './SCRIPT/auth.js';
+    import { showCustomAlert } from './SCRIPT/utils.js';
+
+    const form = document.getElementById('formCompletarPerfil');
+    const emailInput = document.getElementById('email');
+    const btnCompletarPerfil = document.getElementById('btnCompletarPerfil');
+    const spinner = document.getElementById('spinner');
+    const btnCancelar = document.getElementById('btnCancelar');
+
+    let googleUser = null;
+
+    // Cargar datos del usuario Google
+    window.addEventListener('load', () => {
+      const userJson = sessionStorage.getItem('googleUser');
+      
+      if (!userJson) {
+        showCustomAlert('Sesión expirada', 'Por favor intenta nuevamente con Google', [
+          { text: 'Volver a login', action: () => { window.location.href = 'login.html'; } }
+        ]);
+        return;
+      }
+
+      try {
+        googleUser = JSON.parse(userJson);
+        emailInput.value = googleUser.email || '';
+
+        // Intentar prellenar nombre si está disponible
+        if (googleUser.displayName) {
+          const names = googleUser.displayName.split(' ');
+          if (names.length >= 2) {
+            document.getElementById('primerNombre').value = names[0];
+            document.getElementById('primerApellido').value = names[names.length - 1];
+          }
+        }
+
+        // Ocultar loader una vez cargado
+        const loader = document.getElementById('vidalink-loader');
+        if (loader) {
+          loader.classList.add('fade-out');
+          setTimeout(() => loader.remove(), 400);
+        }
+      } catch (error) {
+        console.error('Error al cargar usuario:', error);
+        window.location.href = 'login.html';
+      }
+    });
+
+    // Cancelar y volver a login
+    btnCancelar.addEventListener('click', () => {
+      sessionStorage.removeItem('googleUser');
+      auth.signOut().then(() => {
+        window.location.href = 'login.html';
+      });
+    });
+
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+
+      const primerNombre = document.getElementById('primerNombre').value.trim();
+      const segundoNombre = document.getElementById('segundoNombre').value.trim();
+      const primerApellido = document.getElementById('primerApellido').value.trim();
+      const segundoApellido = document.getElementById('segundoApellido').value.trim();
+      const celular = document.getElementById('celular').value.trim();
+      const esVoluntario = document.getElementById('esVoluntario').checked;
+
+      // Validación
+      if (!primerNombre || !primerApellido || !celular) {
+        showCustomAlert('Campos requeridos', 'Por favor completa los campos obligatorios');
+        return;
+      }
+
+      btnCompletarPerfil.disabled = true;
+      spinner.classList.remove('d-none');
+
+      const datosPersonales = {
+        primerNombre,
+        segundoNombre,
+        primerApellido,
+        segundoApellido,
+        celular,
+        email: googleUser.email
+      };
+
+      const resultado = await completarPerfilGoogle(googleUser.uid, datosPersonales, esVoluntario);
+
+      if (resultado.success) {
+        sessionStorage.removeItem('googleUser');
+        showCustomAlert('Perfil completado', '¡Tu cuenta está lista! Bienvenido a VidaLink', [
+          { text: 'Continuar', action: () => { window.location.href = 'index.html'; } }
+        ]);
+      } else {
+        btnCompletarPerfil.disabled = false;
+        spinner.classList.add('d-none');
+        showCustomAlert('Error', resultado.message || 'No se pudo completar el perfil');
+      }
+    });
+  </script>
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

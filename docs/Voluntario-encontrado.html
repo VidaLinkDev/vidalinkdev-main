@@ -1,0 +1,606 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Voluntario encontrado | VidaLink</title>
+  <link rel="icon" type="image/png" href="RECURSOS/vidalink.png">
+  <link rel="stylesheet" href="CSS/styles.css">
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600&display=swap" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/css/bootstrap.min.css" rel="stylesheet">
+  <style>
+  /* Chat UI tweaks */
+  #chatBody { background: #ffffff; padding: 12px; }
+  .chat-message { display:flex; margin:8px 0; }
+  .bubble { padding:10px; max-width:72%; border-radius:12px; box-shadow: 0 1px 2px rgba(0,0,0,0.04); }
+  .bubble-me { background:#0b5ed7; color:#fff; margin-left:auto; text-align:left; }
+  .bubble-vol { background:#f1f3f5; color:#0f1720; margin-right:auto; text-align:left; }
+  .meta { font-size:0.78rem; color:#0b5ed7; margin-bottom:6px; font-weight:600; }
+  .chat-time { font-size:0.72rem; color:#ffffff80; margin-top:6px; display:block; text-align:right; }
+  .bubble-vol .chat-time { color:#6c757d; text-align:left; }
+  .chat-empty { color:#777; padding:20px; }
+  .modal-body#chatBody { background:#fbfbfb; }
+  .modal-footer .input-group input { border-right:0; }
+  .modal-footer .input-group .btn { border-left:0; }
+  </style>
+</head>
+<body>
+
+  <nav class="navbar navbar-compact">
+    <div class="container-fluid">
+      <a href="index.html" class="d-flex align-items-center gap-2" style="text-decoration: none;">
+        <img src="RECURSOS/logo.png" alt="VidaLink Logo" width="160" height="auto">
+      </a>
+      <div class="d-flex align-items-center gap-3 ms-auto">
+        <img src="RECURSOS/usuario.png" alt="Usuario" width="26" height="26">
+        <div class="estado-conectado d-flex align-items-center gap-1">
+          <img src="RECURSOS/conectado.png" alt="Conectado" width="14" height="14">
+          Conectado
+        </div>
+        <button type="button" class="btn btn-outline-danger" onclick="cerrarSesion()">
+          🚪 Salir
+        </button>
+      </div>
+    </div>
+  </nav>
+
+  <main class="container py-5">
+    <section class="emergencia-hero d-flex align-items-center gap-3">
+      <div class="radar-container">
+        <div class="radar"></div>
+      </div>
+      <div>
+        <h2>Voluntario en camino</h2>
+        <p id="nombreVoluntario" class="fw-bold fs-5 mb-1">Cargando nombre...</p>
+        <p class="mb-0">El voluntario asignado está en camino. Mantente en un lugar seguro y comunícate si es necesario.</p>
+        <small id="tiempoActivo" class="text-muted d-block mt-2">Tiempo activo: —</small>
+      </div>
+    </section>
+
+    <div class="row g-3 mb-4">
+      <div class="col-12 col-md-6">
+        <div class="card shadow-sm">
+          <div class="card-body text-center">
+            <h6 class="fw-bold text-danger">Ubicación de emergencia</h6>
+            <p id="coords" class="mb-0 fw-bold fs-5 text-primary emergencia-coords">Obteniendo ubicación...</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="col-12 col-md-6 d-flex align-items-stretch">
+        <div class="card shadow-sm flex-fill">
+          <div class="card-body d-flex flex-column justify-content-center text-center">
+            <h6 class="fw-bold">Información del voluntario</h6>
+            <div class="d-flex align-items-center justify-content-center gap-3 mt-2">
+              <div id="volAvatar" style="width:96px; height:96px; overflow:hidden; border-radius:12px; background:#f5f5f5; display:flex; align-items:center; justify-content:center;">
+                <!-- Avatar se inserta desde JS -->
+              </div>
+
+              <div class="text-start" style="min-width:180px;">
+                <div>
+                  <h5 id="volNombrePlaceholder" class="mb-0">Sin asignar</h5>
+                </div>
+                <small id="voluntarioStatus" class="d-block text-muted">Detalle del voluntario</small>
+              </div>
+            </div>
+
+            <div class="mt-3 d-flex justify-content-center gap-3">
+              <span class="badge bg-light text-dark">Distancia: <span id="volDistance">—</span></span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="emergencia-actions d-grid gap-3 mb-5">
+      <div class="d-flex gap-3 flex-column flex-sm-row">
+        <button class="btn btn-danger btn-lg fw-bold flex-fill" onclick="abrirGuia()">
+          Ver Guía de Primeros Auxilios
+        </button>
+
+        <button class="btn btn-success btn-lg fw-bold flex-fill" id="btnAbrirChat">
+          💬 Conversar con el voluntario
+        </button>
+      </div>
+
+      <div>
+        <button class="btn btn-outline-secondary btn-lg w-100" onclick="cancelarEmergencia()">
+          Finalizar / Cancelar
+        </button>
+      </div>
+    </div>
+
+  </main>
+
+  <!-- MODAL GUÍA DE PRIMEROS AUXILIOS -->
+  <div class="modal fade" id="modalGuia" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title" id="tituloModal">Guías de Primeros Auxilios</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body" id="contenidoModal">
+          <!-- Se llena con JS -->
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL CHAT -->
+  <div class="modal fade" id="modalChat" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable">
+      <div class="modal-content">
+        <div class="modal-header bg-primary text-white">
+          <h5 class="modal-title" id="tituloChat">Chat con el voluntario</h5>
+          <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body" id="chatBody" style="height: 400px; overflow-y: auto;">
+          <div class="text-center text-muted py-5" id="sinMensajes">Esperando mensajes...</div>
+          <div id="typingIndicator" class="text-muted fst-italic ms-3 mb-2 d-none">Voluntario escribiendo...</div>
+        </div>
+        <div class="modal-footer">
+          <div class="input-group">
+            <input type="text" id="inputMensaje" class="form-control" placeholder="Escribe un mensaje..." autocomplete="off">
+            <button class="btn btn-primary" id="btnEnviar">Enviar</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- SONIDO DE NOTIFICACIÓN -->
+  <audio id="notificationSound" src="RECURSOS/noti.wav" preload="auto"></audio>
+
+  <!-- SCRIPT PRINCIPAL -->
+  <script type="module">
+    import { observarEstadoAuth, cerrarSesion } from './SCRIPT/auth.js';
+    import { db } from './SCRIPT/firebase-init.js';
+    import { doc, getDoc } from "https://www.gstatic.com/firebasejs/12.7.0/firebase-firestore.js";
+
+    document.addEventListener('DOMContentLoaded', () => {
+      const conectadoBtn = document.querySelector('.estado-conectado');
+      const salirBtn = document.querySelector('.btn-outline-danger');
+      const btnVoluntarios = document.getElementById('btn-voluntarios');
+
+      if (salirBtn) {
+        salirBtn.onclick = async () => {
+          await cerrarSesion();
+        };
+      }
+
+      observarEstadoAuth(async (user) => {
+        if (user) {
+          if (conectadoBtn) conectadoBtn.style.display = 'flex';
+          if (salirBtn) salirBtn.style.display = 'flex';
+
+          // Verificar si es voluntario
+          try {
+            const docSnap = await getDoc(doc(db, "usuarios", user.uid));
+            if (docSnap.exists() && docSnap.data().esVoluntario === true) {
+              if (btnVoluntarios) btnVoluntarios.style.display = 'flex';
+            } else {
+              if (btnVoluntarios) btnVoluntarios.style.display = 'none';
+            }
+          } catch (error) {
+            console.error("Error verificando voluntario:", error);
+            if (btnVoluntarios) btnVoluntarios.style.display = 'none';
+          }
+        } else {
+          if (conectadoBtn) conectadoBtn.style.display = 'none';
+          if (salirBtn) salirBtn.style.display = 'none';
+          if (btnVoluntarios) btnVoluntarios.style.display = 'none';
+          // Si no logueado, redirigir a login
+          window.location.href = 'login.html';
+        }
+      });
+    });
+  </script>
+
+  <script>
+    document.addEventListener("DOMContentLoaded", () => {
+      let data = JSON.parse(localStorage.getItem('emergenciaActiva'));
+
+      if (!data || !data.alertaId) {
+        showCustomAlert('Error', 'No se encontró datos de emergencia activa.', [
+          { text: 'Volver al inicio', action: () => { window.location.href = 'index.html'; } }
+        ]);
+        return;
+      }
+
+      // Nombre y detalles del voluntario
+      const nombre = data.voluntarioNombre || 'Voluntario asignado';
+      document.getElementById('nombreVoluntario').innerText = nombre;
+      document.getElementById('volNombrePlaceholder').innerText = nombre;
+
+      // Si hay foto del voluntario, mostrar avatar grande
+      const volAvatarEl = document.getElementById('volAvatar');
+      if (volAvatarEl) {
+        if (data.voluntarioFotoURL) {
+          volAvatarEl.innerHTML = `<img src="${data.voluntarioFotoURL}" alt="Voluntario" style="width:100%; height:100%; object-fit:cover; border-radius:8px;">`;
+        } else {
+          // placeholder con inicial
+          const initial = (data.voluntarioNombre || 'V').charAt(0).toUpperCase();
+          volAvatarEl.innerHTML = `<div style="font-size:32px; color:#cb0519; font-weight:700;">${initial}</div>`;
+        }
+      }
+
+      // Mostrar coordenadas
+      document.getElementById('coords').innerText = `Lat: ${data.lat.toFixed(6)}, Lng: ${data.lon.toFixed(6)}`;
+
+      // Estado del voluntario
+      const statusEl = document.getElementById('voluntarioStatus');
+      if (data.voluntarioETA) {
+        statusEl.innerText = `Llegará en aprox. ${data.voluntarioETA} minutos`;
+      } else {
+        statusEl.innerText = 'En camino — sigue en contacto';
+      }
+
+      // Botón llamar
+      const btnLlamar = document.getElementById('btnLlamarVol');
+      if (data.voluntarioTelefono) {
+        btnLlamar.disabled = false;
+        btnLlamar.onclick = () => { window.location.href = `tel:${data.voluntarioTelefono}`; };
+      } else {
+        btnLlamar.disabled = true;
+      }
+
+      // Distancia en tiempo real (si hay coordenadas del voluntario y de la emergencia)
+      const distEl = document.getElementById('volDistance');
+
+      function toRad(deg){ return deg * Math.PI / 180; }
+      function haversine(lat1, lon1, lat2, lon2){
+        const R = 6371; // km
+        const dLat = toRad(lat2 - lat1);
+        const dLon = toRad(lon2 - lon1);
+        const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+                  Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) *
+                  Math.sin(dLon/2) * Math.sin(dLon/2);
+        const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+        return R * c;
+      }
+
+      let volLat = data.voluntarioLat || (data.voluntarioCoords && data.voluntarioCoords.lat);
+      let volLon = data.voluntarioLon || (data.voluntarioCoords && data.voluntarioCoords.lon);
+      const emLat = data.lat;
+      const emLon = data.lon;
+
+      function updateDistance(){
+        if (volLat && volLon && emLat && emLon){
+          const km = haversine(Number(volLat), Number(volLon), Number(emLat), Number(emLon));
+          distEl.innerText = `${km.toFixed(2)} km`;
+        } else if (data.voluntarioDistance) {
+          distEl.innerText = `${data.voluntarioDistance} km`;
+        } else {
+          distEl.innerText = '—';
+        }
+      }
+
+      updateDistance();
+      const distanciaInterval = setInterval(updateDistance, 8000);
+
+      // Contador de tiempo activo
+      const tiempoEl = document.getElementById('tiempoActivo');
+      setInterval(() => {
+        const mins = Math.floor((Date.now() - data.timestamp) / 60000);
+        const secs = Math.floor(((Date.now() - data.timestamp) % 60000) / 1000);
+        tiempoEl.innerText = `Activada hace ${mins}m ${secs}s`;
+      }, 1000);
+
+      // El manejo del chat se realiza desde el módulo (script type="module") más abajo
+    });
+
+    // Funciones de guía de primeros auxilios (igual que en emergencia.html)
+    const guias = {
+      paro: [
+        "Verifica si la persona responde (llama y sacude suavemente)",
+        "Si no responde, pide ayuda y llama al 123 o emergencias",
+        "Coloca a la persona boca arriba en superficie firme",
+        "Inicia compresiones torácicas: 100-120 por minuto, profundidad 5-6 cm",
+        "Si estás capacitado, combina con ventilaciones (30:2)",
+        "Continúa hasta que llegue ayuda profesional o use DEA"
+      ],
+      asfixia: [
+        "Pregunta: ¿Puedes hablar o toser?",
+        "Si no responde, da 5 golpes fuertes entre los omóplatos",
+        "Si no funciona, realiza 5 compresiones abdominales (maniobra de Heimlich)",
+        "Alterna golpes y compresiones hasta liberar la vía aérea",
+        "Si pierde el conocimiento, inicia RCP"
+      ],
+      hemorragia: [
+        "Aplica presión directa firme sobre la herida con tela limpia",
+        "Eleva la extremidad afectada por encima del corazón si es posible",
+        "No retires objetos incrustados, presiona alrededor",
+        "Si la sangre empapa la tela, coloca otra encima sin quitar la primera",
+        "Mantén presión hasta llegada de ayuda médica"
+      ],
+      otra: [
+        "Mantén la calma y evalúa la seguridad de la escena",
+        "Llama inmediatamente al 123 o emergencias locales",
+        "No muevas a la persona si sospechas lesión en columna",
+        "Proporciona confort y monitorea signos vitales",
+        "Sigue instrucciones del operador de emergencias"
+      ]
+    };
+
+    let tipoActual = "";
+    let pasoActual = 0;
+
+    function abrirGuia() {
+      document.getElementById("tituloModal").innerText = "Selecciona tipo de emergencia";
+      document.getElementById("contenidoModal").innerHTML = `
+        <div class="row g-3 text-center">
+          <div class="col-6">
+            <button class="btn btn-outline-danger w-100 py-3" onclick="iniciarPasos('paro')">
+              <strong>Paro Cardíaco</strong>
+            </button>
+          </div>
+          <div class="col-6">
+            <button class="btn btn-outline-warning w-100 py-3" onclick="iniciarPasos('asfixia')">
+              <strong>Asfixia</strong>
+            </button>
+          </div>
+          <div class="col-6">
+            <button class="btn btn-outline-info w-100 py-3" onclick="iniciarPasos('hemorragia')">
+              <strong>Hemorragia</strong>
+            </button>
+          </div>
+          <div class="col-6">
+            <button class="btn btn-outline-secondary w-100 py-3" onclick="iniciarPasos('otra')">
+              <strong>Otra Emergencia</strong>
+            </button>
+          </div>
+        </div>
+      `;
+
+      new bootstrap.Modal(document.getElementById('modalGuia')).show();
+    }
+
+    function iniciarPasos(tipo) {
+      tipoActual = tipo;
+      pasoActual = 0;
+      renderPaso();
+    }
+
+    function renderPaso() {
+      const pasos = guias[tipoActual];
+
+      document.getElementById("tituloModal").innerText = 
+        tipoActual.charAt(0).toUpperCase() + tipoActual.slice(1) + " - Paso " + (pasoActual + 1) + "/" + pasos.length;
+
+      document.getElementById("contenidoModal").innerHTML = `
+        <div class="text-center">
+          <div class="alert alert-danger py-4 mb-4">
+            <h5 class="fw-bold">${pasos[pasoActual]}</h5>
+          </div>
+
+          <div class="d-flex justify-content-between align-items-center">
+            <button class="btn btn-outline-secondary" onclick="anteriorPaso()" ${pasoActual === 0 ? 'disabled' : ''}>
+              Anterior
+            </button>
+            <span class="fw-bold">Paso ${pasoActual + 1} de ${pasos.length}</span>
+            <button class="btn btn-primary" onclick="siguientePaso()" ${pasoActual === pasos.length - 1 ? 'disabled' : ''}>
+              Siguiente
+            </button>
+          </div>
+        </div>
+      `;
+    }
+
+    function siguientePaso() {
+      if (pasoActual < guias[tipoActual].length - 1) {
+        pasoActual++;
+        renderPaso();
+      }
+    }
+
+    function anteriorPaso() {
+      if (pasoActual > 0) {
+        pasoActual--;
+        renderPaso();
+      }
+    }
+
+    function cancelarEmergencia() {
+      if (confirm("¿Estás seguro de cancelar la emergencia? Esto notificará a los voluntarios.")) {
+        window.dispatchEvent(new CustomEvent('cancelarEmergenciaManual'));
+      }
+    }
+  </script>
+
+  <!-- SCRIPT DEL CHAT + NOTIFICACIÓN -->
+  <script type="module">
+  import { db } from './SCRIPT/firebase-init.js';
+  import { collection, addDoc, onSnapshot, orderBy, query, serverTimestamp, doc, updateDoc, deleteField, deleteDoc } from "https://www.gstatic.com/firebasejs/12.7.0/firebase-firestore.js";
+  import { showCustomAlert } from './SCRIPT/utils.js';
+
+  let alertaIdActual = null;
+  let volNombre = null;
+  let unsubscribeChat = null;
+  let unsubscribeTyping = null;
+  let typingTimeout = null;
+  const notificationSound = document.getElementById('notificationSound');
+
+  function formatTime(ts){
+    try { return ts.toDate().toLocaleTimeString('es-CO'); } catch(e){ return ''; }
+  }
+
+  document.addEventListener('DOMContentLoaded', () => {
+    const data = JSON.parse(localStorage.getItem('emergenciaActiva'));
+    if (data && data.alertaId) {
+      alertaIdActual = data.alertaId;
+      volNombre = data.voluntarioNombre || data.nombreVoluntario || null;
+
+      const modalEl = document.getElementById('modalChat');
+      const modal = new bootstrap.Modal(modalEl);
+
+      document.getElementById('btnAbrirChat').onclick = () => {
+        document.getElementById('tituloChat').innerText = "Chat con el voluntario";
+        modal.show();
+      };
+
+      modalEl.addEventListener('shown.bs.modal', () => {
+        cargarMensajes();
+        escucharTyping();
+        const input = document.getElementById('inputMensaje');
+        if (input) input.focus();
+      });
+
+      modalEl.addEventListener('hidden.bs.modal', () => {
+        if (unsubscribeChat) { unsubscribeChat(); unsubscribeChat = null; }
+        if (unsubscribeTyping) { unsubscribeTyping(); unsubscribeTyping = null; }
+        const chatBody = document.getElementById('chatBody');
+        if (chatBody) {
+          chatBody.innerHTML = '<div class="text-center chat-empty" id="sinMensajes">Esperando mensajes...</div>';
+        }
+      });
+    }
+  });
+
+  function crearBurbuja(msg){
+    const wrapper = document.createElement('div');
+    wrapper.className = 'chat-message ' + (msg.esVoluntario ? 'vol' : 'me');
+
+    const bubble = document.createElement('div');
+    bubble.className = 'bubble ' + (msg.esVoluntario ? 'bubble-vol' : 'bubble-me');
+
+    const who = document.createElement('small');
+    who.className = 'meta d-block';
+    who.textContent = msg.esVoluntario ? (volNombre || 'Voluntario') : 'tú';
+
+    const text = document.createElement('p');
+    text.className = 'mb-0';
+    text.textContent = msg.texto;
+
+    const time = document.createElement('small');
+    time.className = 'chat-time d-block text-muted';
+    time.textContent = formatTime(msg.timestamp) || '';
+
+    bubble.appendChild(who);
+    bubble.appendChild(text);
+    bubble.appendChild(time);
+
+    wrapper.appendChild(bubble);
+    return wrapper;
+  }
+
+  function cargarMensajes() {
+    if (!alertaIdActual) return;
+    if (unsubscribeChat) unsubscribeChat();
+
+    const q = query(collection(db, "alertas", alertaIdActual, "mensajes"), orderBy("timestamp"));
+
+    unsubscribeChat = onSnapshot(q, (snapshot) => {
+        const chatBody = document.getElementById('chatBody');
+        if (!chatBody) return;
+        chatBody.innerHTML = '';
+        if (snapshot.empty) {
+          const empty = document.createElement('div');
+          empty.className = 'text-center chat-empty';
+          empty.id = 'sinMensajes';
+          empty.textContent = 'Esperando mensajes...';
+          chatBody.appendChild(empty);
+        } else {
+          snapshot.forEach((docSnap) => {
+            const msg = docSnap.data();
+            const node = crearBurbuja(msg);
+            chatBody.appendChild(node);
+          });
+        }
+
+        chatBody.scrollTop = chatBody.scrollHeight;
+
+        // Sonido solo cuando llega mensaje del voluntario
+        if (!snapshot.empty) {
+          const ultimoMsg = snapshot.docs[snapshot.docs.length - 1].data();
+          if (ultimoMsg.esVoluntario) {
+            notificationSound.play().catch(() => {});
+          }
+        }
+    }, (error) => {
+      console.error("Error en listener de mensajes:", error);
+      showCustomAlert('Error', 'No se pudieron cargar los mensajes');
+    });
+  }
+
+  function escucharTyping() {
+    if (!alertaIdActual) return;
+    if (unsubscribeTyping) unsubscribeTyping();
+
+    const alertaRef = doc(db, "alertas", alertaIdActual);
+
+    unsubscribeTyping = onSnapshot(alertaRef, (snap) => {
+      const data = snap.data() || {};
+      const indicator = document.getElementById('typingIndicator');
+      if (indicator) {
+        if (data.isTypingVoluntario) indicator.classList.remove('d-none');
+        else indicator.classList.add('d-none');
+      }
+    });
+  }
+
+  // Indicador de escritura del paciente
+  document.getElementById('inputMensaje')?.addEventListener('input', () => {
+    if (!alertaIdActual) return;
+    clearTimeout(typingTimeout);
+    updateDoc(doc(db, "alertas", alertaIdActual), { isTypingPaciente: true });
+    typingTimeout = setTimeout(() => {
+      updateDoc(doc(db, "alertas", alertaIdActual), { isTypingPaciente: deleteField() });
+    }, 3000);
+  });
+
+  // Enviar mensaje
+  document.getElementById('btnEnviar')?.addEventListener('click', enviarMensaje);
+  document.getElementById('inputMensaje')?.addEventListener('keypress', (e) => {
+    if (e.key === 'Enter') enviarMensaje();
+  });
+
+  async function enviarMensaje() {
+    const input = document.getElementById('inputMensaje');
+    const texto = input?.value.trim();
+    if (!texto || !alertaIdActual) return;
+
+    const btnEnviar = document.getElementById('btnEnviar');
+    try {
+      if (btnEnviar) btnEnviar.disabled = true;
+      await addDoc(collection(db, "alertas", alertaIdActual, "mensajes"), {
+        texto,
+        esVoluntario: false,
+        timestamp: serverTimestamp()
+      });
+      if (input) input.value = '';
+      await updateDoc(doc(db, "alertas", alertaIdActual), { isTypingPaciente: deleteField() });
+      if (btnEnviar) btnEnviar.disabled = false;
+      const chatBody = document.getElementById('chatBody');
+      if (chatBody) chatBody.scrollTop = chatBody.scrollHeight;
+    } catch (error) {
+      console.error("Error enviando mensaje:", error);
+      showCustomAlert('Error', 'No se pudo enviar el mensaje');
+      if (btnEnviar) btnEnviar.disabled = false;
+    }
+  }
+
+  window.addEventListener('cancelarEmergenciaManual', async () => {
+    const data = JSON.parse(localStorage.getItem('emergenciaActiva'));
+    if (data && data.alertaId) {
+      try {
+        await deleteDoc(doc(db, "alertas", data.alertaId));
+      } catch (error) {
+        console.error("Error al eliminar alerta:", error);
+      }
+    }
+    localStorage.removeItem('emergenciaActiva');
+    showCustomAlert('Éxito', 'Emergencia cancelada correctamente.', [
+      { text: 'Volver al inicio', action: () => { window.location.href = 'index.html'; } }
+    ]);
+  });
+</script>
+
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/js/bootstrap.bundle.min.js"></script>
+
+  <footer class="site-footer">
+    <p>No reemplazamos ambulancias, las complementamos con ayuda ciudadana.</p>
+    <p>&copy; 2025 VidaLink. All rights reserved.</p>
+  </footer>
+</body>
+</html>

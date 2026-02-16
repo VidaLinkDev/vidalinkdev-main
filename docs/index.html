@@ -1,0 +1,526 @@
+<!DOCTYPE html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>VidaLink</title>
+    <!-- RUTAS CORRECTAS DESDE /docs -->
+  <link rel="icon" type="image/png" href="RECURSOS/vidalink.png">
+  <link rel="stylesheet" href="CSS/styles.css">
+
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600&display=swap" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/css/bootstrap.min.css" rel="stylesheet">
+</head>
+
+<body class="page-transition">
+  <!-- LOADER GLOBAL -->
+  <div id="vidalink-loader">
+    <div class="loader-spinner"></div>
+    <img src="RECURSOS/logo.png" width="150" alt="VidaLink">
+  </div>
+
+<nav class="navbar navbar-expand-lg sticky-top custom-nav-vidalink shadow-sm">
+  <div class="container-fluid">
+    <a class="navbar-brand d-flex align-items-center gap-2" href="index.html">
+      <img src="RECURSOS/logo.png" alt="VidaLink Logo" width="160" height="auto">
+    </a>
+
+    <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+      <span class="navbar-toggler-icon"></span>
+    </button>
+
+    <div class="collapse navbar-collapse" id="navbarNav">
+      <div class="d-flex align-items-center gap-3 ms-auto py-2 py-lg-0" id="nav-actions">
+        <button id="btn-perfil" class="btn btn-outline-danger d-flex align-items-center gap-1">
+          <img src="RECURSOS/usuario.png" width="22" height="22" alt="Perfil">
+          Mi Perfil
+        </button>
+
+        <div class="estado-conectado d-flex align-items-center gap-1">
+          <img src="RECURSOS/conectado.png" width="14" height="14" alt="Conectado">
+          Disponible
+        </div>
+
+        <button id="btn-voluntarios" class="btn btn-outline-primary d-flex align-items-center gap-2">
+          Panel de Voluntarios
+        </button>
+
+        <button id="btn-salir" class="btn btn-outline-danger d-flex align-items-center gap-2">
+          <img src="RECURSOS/Exit.png" width="20" height="20" alt="Salir">
+          Salir
+        </button>
+      </div>
+    </div>
+  </div>
+</nav>
+
+    <main style="display: none;">
+      <section id="home" class="home-section">
+        <figure class="text-center">
+          <blockquote class="blockquote">
+            <h1 class="brand-title">Respuesta Rápida a Emergencias</h1>
+            <h5 class="subtitle">
+              Al activar el botón SOS, se enviará tu ubicación y se alertará
+            </h5>
+            <h5 class="subtitle">
+              a voluntarios cercanos para que puedan brindarte asistencia médica inmediata.
+            </h5>
+          </blockquote>
+        </figure>
+
+        <!-- CONTENEDOR CORAZÓN + ECG -->
+        <div class="sos-container">
+          <svg class="ecg" viewBox="0 0 1000 100" preserveAspectRatio="none">
+            <polyline class="ecg-line" points="0,50 100,50 150,50 170,20 190,80 210,50 260,50 300,50 330,20 350,80 370,50 450,50 500,50 530,20 550,80 570,50 650,50 700,50 730,20 750,80 770,50 1000,50"/>
+          </svg>
+
+          <button type="button" class="sos-button">
+            <div class="sos-content">
+              <img src="RECURSOS/emergencia.png" alt="Emergencia">
+              <span class="sos-text">SOS</span>
+            </div>
+          </button>
+        </div>
+
+        <p class="sos-instruction">
+          Para activar la emergencia <strong>Presiona SOS</strong> 
+          y se alertará al voluntario más cercano
+        </p>
+
+        <!-- Historial de alertas del usuario (debajo del SOS) -->
+        <section id="historial-alertas" class="my-4 w-100">
+          <div class="container px-0">
+            <h5 class="brand-title mb-2">Mis alertas activas</h5>
+            <div id="lista-alertas" class="row g-3">
+              <div class="col-12 text-center text-muted">Cargando alertas...</div>
+            </div>
+          </div>
+        </section>
+
+        <div class="location-info">
+          <div class="location-text">
+            <div class="location-title">
+              <img src="RECURSOS/ubicacion.png" class="location-icon" alt="Ubicación">
+              <strong>Ubicación automática activada</strong>
+            </div>
+            <p>Tu ubicación se enviará automáticamente con la alerta</p>
+          </div>
+        </div>
+
+        <div class="features">
+          <div class="feature-card" data-bs-toggle="modal" data-bs-target="#modalRespuesta">
+            <img src="RECURSOS/respuesta.png" alt="">
+            <h5>Respuesta Inmediata</h5>
+            <p>Los voluntarios más cercanos recibirán tu alerta al instante</p>
+          </div> 
+          <div class="feature-card" data-bs-toggle="modal" data-bs-target="#modalUbicacion">
+            <img src="RECURSOS/ubi.png" alt="">
+            <h5>Ubicación Precisa</h5>
+            <p>Tu ubicación se enviará automáticamente</p>
+          </div>
+          <div class="feature-card" data-bs-toggle="modal" data-bs-target="#modalGuia">
+            <img src="RECURSOS/guia.png" alt="">
+            <h5>Guía de Primeros Auxilios</h5>
+            <p>Recibe instrucciones mientras esperas ayuda</p>
+          </div>
+        </div>
+
+                  <!-- Modal Respuesta Inmediata -->
+          <div class="modal fade" id="modalRespuesta" tabindex="-1">
+            <div class="modal-dialog modal-dialog-centered modal-lg">
+              <div class="modal-content modal-custom-height">
+
+                <div class="modal-header align-items-center">
+                  <img src="RECURSOS/respuesta.png" alt="" width="30" height="30" class="me-2">
+                  <h5 class="modal-title mb-0">Respuesta Inmediata</h5>
+                  <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+
+                <!-- SCROLL SOLO AQUÍ -->
+                <div class="modal-body modal-body-scroll">
+
+                  <!-- Caja roja -->
+                  <div class="info-box danger">
+                    <h6>¿Cómo funciona?</h6>
+                    <p>Al activar el botón SOS, nuestro sistema inmediatamente:</p>
+                    <ul>
+                      <li>Localiza tu posición exacta usando geocalización</li>
+                      <li>Identifica voluntarios en un radio de 5 km cerca de ti</li>
+                      <li>Envía notificaciones instantáneas</li>
+                      <li>Proporciona instrucciones de primeros auxilios</li>
+                    </ul>
+                  </div>
+
+                  <!-- Caja azul -->
+                  <div class="info-box info">
+                    <h6>Tiempo de Respuesta</h6>
+                    <p>
+                      Los voluntarios pueden aceptar tu emergencia en menos de
+                      1 minuto. Una vez aceptada, recibirás una estimación
+                      del tiempo de llegada.
+                    </p>
+                  </div>
+
+                  <!-- Caja verde -->
+                  <div class="info-box vol">
+                    <h6>Voluntarios Capacitados</h6>
+                    <p>
+                      Todos nuestros voluntarios están certificados en primeros auxilios
+                      y han pasado por un proceso de verificación riguroso. Estamos listos para ayudarte.
+                    </p>
+                  </div>
+
+                </div>
+              </div>
+            </div>
+          </div>
+
+              <!-- Modal Ubicación Precisa -->
+              <div class="modal fade" id="modalUbicacion" tabindex="-1">
+            <div class="modal-dialog modal-dialog-centered modal-lg">
+              <div class="modal-content modal-custom-height">
+
+                <div class="modal-header align-items-center">
+                  <img src="RECURSOS/ubi.png" alt="" width="30" height="30" class="me-2">
+                  <h5 class="modal-title mb-0">Ubicación Precisa</h5>
+                  <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+
+                <!-- SCROLL SOLO AQUÍ -->
+                <div class="modal-body modal-body-scroll">
+
+                  <!-- Caja roja -->
+                  <div class="info-box danger">
+                    <h6>Geolocalización Avanzada</h6>
+                    <p>Empleamos sistemas de geolocalización de alta exactitud para identificar tu ubicación en tiempo real:</p>
+                    <ul>
+                      <li>Margen de error de hasta 3 metros en entornos favorables</li>
+                      <li>Operativo tanto en espacios abiertos como cerrados</li>
+                      <li>Actualización automática de la posición cada 10 segundos</li>
+                      <li>Compatible con la mayoría de los smartphones actuales</li>
+                    </ul>
+                  </div>
+
+                  <!-- Caja naranja -->
+                  <div class="info-box info">
+                    <h6>Protección de Datos y Confidencialidad</h6>
+                    <p>
+                      Tu ubicación se transmite únicamente cuando activas una alerta 
+                      de emergencia y solo es visible para voluntarios previamente verificados. 
+                      La información se elimina de forma automática tras 24 horas.
+                    </p>
+                  </div>
+
+                  <!-- Caja verde -->
+                  <div class="info-box vol">
+                    <h6>Conexión con Plataformas de Mapas</h6>
+                    <p>
+                    Los voluntarios reciben acceso directo a tu posición mediante Google Maps,
+                    con indicaciones detalladas paso a paso para llegar hasta ti 
+                    de la manera más rápida y eficiente.
+                    </p>
+                  </div>
+
+                </div>
+              </div>
+            </div>
+          </div>
+
+        <!-- Modal Guía de Primeros Auxilios -->
+        <div class="modal fade" id="modalGuia" tabindex="-1">
+            <div class="modal-dialog modal-dialog-centered modal-lg">
+              <div class="modal-content modal-custom-height">
+
+                <div class="modal-header align-items-center">
+                  <img src="RECURSOS/guia.png" alt="" width="30" height="30" class="me-2">
+                  <h5 class="modal-title mb-0">Guía de Primeros Auxilios</h5>
+                  <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+
+                <!-- SCROLL SOLO AQUÍ -->
+                <div class="modal-body modal-body-scroll">
+
+                  <!-- Caja roja -->
+                  <div class="info-box danger">
+                    <h6>Indicaciones Automáticas</h6>
+                    <p>De acuerdo con la emergencia que indiques, el sistema te proporcionará instrucciones adaptadas a la situación:</p>
+                    <ul>
+                      <li>Paro cardíaco: Procedimientos de RCP y uso del desfibrilador</li>
+                      <li>Asfixia: Aplicación guiada de la maniobra de Heimlichi</li>
+                      <li>Lesiones graves: Técnicas para detener hemorragias y realizar vendajes</li>
+                      <li>Otras emergencias: Lineamientos generales de primeros auxilios</li>
+                    </ul>
+                  </div>
+
+                  <!-- Caja naranja -->
+                  <div class="info-box info">
+                    <h6>Temporizadores Integrados</h6>
+                    <p>
+                     Cada guía incorpora temporizadores automáticos que te ayudan
+                     a seguir el ritmo adecuado durante la aplicación de las técnicas
+                     de primeros auxilios.
+                    </p>
+                  </div>
+
+                  <!-- Caja amarilla -->
+                  <div class="info-box ama">
+                    <h6>Aviso Importante</h6>
+                    <p>
+                      Estas indicaciones están diseñadas para asistirte mientras 
+                      llega ayuda profesional. Es fundamental contactar al 911 
+                      de forma inmediata y acatar las instrucciones del personal 
+                      médico al arribar.
+                    </p>
+                  </div>
+
+                  <!-- Caja verde -->
+                  <div class="info-box vol">
+                    <h6>Disponibilidad sin Conexión</h6>
+                    <p>
+                      Las guías de primeros auxilios pueden consultarse 
+                      sin acceso a internet, garantizando que siempre dispongas 
+                      de la información necesaria en cualquier momento.
+                    </p>
+                  </div>
+
+                </div>
+              </div>
+            </div>
+          </div>
+
+        <!-- Sección de uso responsable -->
+        <div class="warning-info">
+          <div class="warning-text">
+            <div class="warning-title">
+              <img src="RECURSOS/warning.png" class="warning-icon" alt="Cuidado" width="48" height="48">
+              <strong>Ten un uso responsable</strong>
+            </div>
+            <p>El botón SOS debe activarse solo en situaciones de emergencia médica reales. Su uso inapropiado puede generar consecuencias legales y comprometer la atención de casos verdaderamente urgentes.</p>
+          </div>
+        </div>
+      </section>
+    
+      <!-- Historial (movido debajo del SOS) -->
+    </main>
+
+    <!-- SCRIPT PRINCIPAL -->
+  <script type="module">
+  import { observarEstadoAuth, cerrarSesion } from './SCRIPT/auth.js';
+  import { inicializarSOS } from './SCRIPT/sos.js';
+  import { db } from './SCRIPT/firebase-init.js';
+  import { doc, getDoc, updateDoc, onSnapshot, collection, query, where, orderBy, serverTimestamp } from "https://www.gstatic.com/firebasejs/12.7.0/firebase-firestore.js";
+  import { showCustomAlert, showCustomConfirm } from './SCRIPT/utils.js';
+
+  document.addEventListener('DOMContentLoaded', () => {
+    const btnPerfil = document.getElementById('btn-perfil');
+    const btnSalir = document.getElementById('btn-salir');
+    const btnVoluntarios = document.getElementById('btn-voluntarios');
+    const conectadoBtn = document.querySelector('.estado-conectado');
+    const mainContent = document.querySelector('main');
+    const loader = document.getElementById('vidalink-loader');
+
+    const quitarLoader = () => {
+      if (loader) {
+        loader.classList.add('fade-out');
+        setTimeout(() => loader.remove(), 400);
+      }
+    };
+
+    // Ocultar botones de la navbar inicialmente para evitar saltos visuales
+    const navButtons = document.querySelectorAll('.navbar .ms-auto > *');
+    navButtons.forEach(btn => btn.style.display = 'none');
+    // Asegurar ocultamiento explícito de controles voluntario si no está activo
+    if (btnVoluntarios) btnVoluntarios.style.display = 'none';
+    if (conectadoBtn) conectadoBtn.style.display = 'none';
+
+    // Limpiar rastro de emergencias previas si se llega a index
+    if (location.pathname.endsWith('index.html') || location.pathname === '/') {
+        localStorage.removeItem('alertaAceptadaNotificada_' + (JSON.parse(localStorage.getItem('emergenciaActiva'))?.alertaId || ''));
+    }
+
+    if (btnPerfil) btnPerfil.onclick = () => location.href = 'perfil.html';
+    if (btnVoluntarios) btnVoluntarios.onclick = () => location.href = 'voluntarios.html';
+
+    if (btnSalir) {
+      btnSalir.onclick = async () => {
+        await cerrarSesion();
+        // cerrarSesion ya redirige a index.html
+      };
+    }
+
+    observarEstadoAuth(async (user) => {
+      if (!user) {
+        // Redirigir a login.html si no está autenticado
+        location.replace('login.html');
+        return;
+      }
+      
+      quitarLoader();
+
+      // USUARIO LOGUEADO
+      if (mainContent) {
+        mainContent.style.display = 'block'; // Mostrar el contenido principal si está logueado
+      }
+
+      if (btnPerfil) btnPerfil.style.display = 'flex';
+      if (btnSalir) btnSalir.style.display = 'flex';
+
+      try {
+        const userRef = doc(db, "usuarios", user.uid);
+
+        // Escuchar cambios en el documento del usuario para actualizar el nav en tiempo real
+        const unsubscribeUser = onSnapshot(userRef, (snap) => {
+          if (!snap.exists()) {
+            if (btnVoluntarios) btnVoluntarios.style.display = 'none';
+            if (conectadoBtn) conectadoBtn.style.display = 'none';
+            return;
+          }
+
+          const userData = snap.data();
+
+          if (userData.esVoluntario) {
+            if (btnVoluntarios) btnVoluntarios.style.display = 'flex';
+            if (conectadoBtn) {
+              conectadoBtn.style.display = 'flex';
+              conectadoBtn.style.pointerEvents = 'auto';
+              conectadoBtn.style.cursor = 'pointer';
+
+              const actualizarUIEstado = (estado) => {
+                if (estado === 'no_disponible') {
+                  conectadoBtn.innerHTML = `<img src="RECURSOS/warning.png" width="14" height="14"> No disponible`;
+                  conectadoBtn.style.backgroundColor = '#fff4f4';
+                  conectadoBtn.style.color = '#cb0519';
+                  conectadoBtn.style.borderColor = '#f5c2c2';
+                } else if (estado === 'ocupado') {
+                  conectadoBtn.innerHTML = `<img src="RECURSOS/ubi.png" width="14" height="14"> Ocupado`;
+                  conectadoBtn.style.backgroundColor = '#fffad7';
+                  conectadoBtn.style.color = '#856404';
+                  conectadoBtn.style.borderColor = '#ffeeba';
+                } else {
+                  conectadoBtn.innerHTML = `<img src="RECURSOS/conectado.png" width="14" height="14"> Disponible`;
+                  conectadoBtn.style.backgroundColor = '#e6f7ec';
+                  conectadoBtn.style.color = '#2f8f5b';
+                  conectadoBtn.style.borderColor = '#7fd3a6';
+                }
+              };
+
+              actualizarUIEstado(userData.estadoVoluntario || 'disponible');
+
+              conectadoBtn.onclick = async () => {
+                const nuevoEstado = (userData.estadoVoluntario || 'disponible') === 'disponible' ? 'no_disponible' : 'disponible';
+                actualizarUIEstado(nuevoEstado);
+                await updateDoc(userRef, { estadoVoluntario: nuevoEstado });
+              };
+            }
+          } else {
+            if (btnVoluntarios) btnVoluntarios.style.display = 'none';
+            if (conectadoBtn) conectadoBtn.style.display = 'none';
+          }
+        });
+      } catch (e) {
+        console.error("Error verificando rol", e);
+      }
+
+      inicializarSOS();
+
+      // Historial de alertas del usuario: escuchar alertas activas/asignadas
+      const listaAlertas = document.getElementById('lista-alertas');
+      if (listaAlertas) {
+        try {
+          const qAlerts = query(
+            collection(db, 'alertas'),
+            where('usuarioId', '==', user.uid),
+            orderBy('timestamp', 'desc')
+          );
+
+          onSnapshot(qAlerts, (snap) => {
+            listaAlertas.innerHTML = '';
+            const docs = snap.docs.filter(d => {
+              const s = d.data().estado;
+              return s === 'activa' || s === 'asignada';
+            });
+
+            if (docs.length === 0) {
+              listaAlertas.innerHTML = `<div class="col-12 text-center text-muted">No tienes alertas activas.</div>`;
+              return;
+            }
+
+            docs.forEach(docSnap => {
+              const a = docSnap.data();
+              const id = docSnap.id;
+              const fecha = a.timestamp ? new Date(a.timestamp.toDate()).toLocaleString('es-CO') : 'Reciente';
+              const estadoText = a.estado === 'asignada' ? 'Asignada' : 'Activa';
+              const voluntario = a.voluntarioNombre ? `<strong>Voluntario:</strong> ${a.voluntarioNombre}` : '';
+
+              const latDisplay = (a.latitud !== undefined) ? a.latitud.toFixed(5) : (a.lat !== undefined ? a.lat.toFixed(5) : '-');
+              const lonDisplay = (a.longitud !== undefined) ? a.longitud.toFixed(5) : (a.lon !== undefined ? a.lon.toFixed(5) : '-');
+
+              const card = document.createElement('div');
+              card.className = 'col-md-6';
+              card.innerHTML = `
+                <div class="card shadow-sm p-3 h-100">
+                  <div class="d-flex justify-content-between align-items-start">
+                    <div>
+                      <h6 class="mb-1">Estado: <span class="text-danger">${estadoText}</span></h6>
+                      <p class="mb-1 small text-muted">${fecha}</p>
+                      <p class="mb-1">${voluntario}</p>
+                      <p class="mb-0 small text-muted"><strong>Ubicación:</strong> ${latDisplay}, ${lonDisplay}</p>
+                    </div>
+                    <div class="d-flex flex-column align-items-end gap-2">
+                      <button class="btn btn-sm btn-primary btn-open" data-id="${id}">Abrir</button>
+                      <button class="btn btn-sm btn-outline-danger btn-cancel" data-id="${id}">Cancelar</button>
+                    </div>
+                  </div>
+                </div>
+              `;
+
+              listaAlertas.appendChild(card);
+            });
+
+            // Attach events
+            document.querySelectorAll('.btn-open').forEach(btn => {
+              btn.addEventListener('click', (e) => {
+                const id = e.currentTarget.dataset.id;
+                const alertaDoc = docs.find(d => d.id === id);
+                if (!alertaDoc) return;
+                const a = alertaDoc.data();
+                const payload = { alertaId: id, lat: a.latitud ?? a.lat, lon: a.longitud ?? a.lon, timestamp: a.timestamp?.toMillis?.() || Date.now(), voluntarioNombre: a.voluntarioNombre };
+                localStorage.setItem('emergenciaActiva', JSON.stringify(payload));
+                window.location.href = 'emergencia.html';
+              });
+            });
+
+            document.querySelectorAll('.btn-cancel').forEach(btn => {
+              btn.addEventListener('click', (e) => {
+                const id = e.currentTarget.dataset.id;
+                showCustomConfirm('Cancelar alerta', '¿Deseas cancelar esta alerta? Esto notificará a los voluntarios.', async () => {
+                  try {
+                    await updateDoc(doc(db, 'alertas', id), { estado: 'cancelada', canceladaTimestamp: serverTimestamp() });
+                    showCustomAlert('Alerta cancelada', 'La alerta ha sido cancelada.');
+                  } catch (err) {
+                    console.error(err);
+                    showCustomAlert('Error', 'No se pudo cancelar la alerta.');
+                  }
+                });
+              });
+            });
+          }, (err) => {
+            console.error('Error onSnapshot alertas:', err);
+            listaAlertas.innerHTML = `<div class="col-12 text-center text-danger">Error cargando alertas.</div>`;
+          });
+        } catch (err) {
+          console.error('Error escuchando alertas:', err);
+        }
+      }
+    });
+  });
+</script>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/js/bootstrap.bundle.min.js"></script>
+
+<footer class="site-footer">
+  <p>No reemplazamos ambulancias, las complementamos con ayuda ciudadana.</p>
+  <p>&copy; 2025 VidaLink</p>
+</footer>
+</body>
+</html>

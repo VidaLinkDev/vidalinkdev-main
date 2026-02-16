@@ -1,0 +1,501 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Panel de Voluntarios - VidaLink</title>
+  <link rel="icon" type="image/png" href="RECURSOS/vidalink.png">
+  <link rel="stylesheet" href="CSS/styles.css">
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600&display=swap" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css" />
+</head>
+<body>
+  <nav class="navbar navbar-compact">
+    <div class="container-fluid">
+      <a href="index.html" class="d-flex align-items-center gap-2" style="text-decoration: none;">
+        <img src="RECURSOS/logo.png" alt="VidaLink Logo" width="160" height="auto">
+      </a>
+      <div class="d-flex align-items-center gap-3 ms-auto">
+        <div class="d-flex align-items-center gap-2 px-3 py-2 rounded" style="background: #fff3e0; border-left: 3px solid #ff9800;">
+          <span id="voluntarioNombre" class="text-dark fw-600 small">Cargando...</span>
+          <span id="contadorAlertas" class="badge bg-danger">0</span>
+        </div>
+        <a href="perfil.html" class="btn btn-outline-primary btn-sm">
+          👤 Perfil
+        </a>
+        <button type="button" class="btn btn-outline-secondary btn-sm" onclick="history.back()">
+          ← Volver
+        </button>
+      </div>
+    </div>
+  </nav>
+
+  <main class="container my-5">
+    <h2 class="brand-title text-center mb-2">Panel de Voluntarios</h2>
+    <p class="subtitle text-center mb-5">Alertas de emergencia activas en tiempo real</p>
+
+    <div id="loading" class="text-center py-5">
+      <div class="spinner-border text-danger" role="status" style="width: 3rem; height: 3rem;"></div>
+      <p class="mt-3 text-muted fw-bold">Cargando alertas activas...</p>
+    </div>
+
+    <div id="alertas-lista" class="row" style="display: none;"></div>
+
+    <div id="mapa" style="height: 450px; margin-top: 4rem; border-radius: 20px; overflow: hidden; box-shadow: 0 10px 30px rgba(0,0,0,0.15);"></div>
+  </main>
+
+  <!-- Modal del Chat -->
+  <div class="modal fade" id="modalChat" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable">
+      <div class="modal-content">
+        <div class="modal-header bg-primary text-white">
+          <h5 class="modal-title" id="tituloChat">Conversar con el paciente</h5>
+          <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body" id="chatBody" style="height: 400px; overflow-y: auto;">
+          <div class="text-center text-muted py-5" id="sinMensajes">Esperando mensajes...</div>
+          <div id="typingIndicator" class="text-muted fst-italic ms-3 mb-2 d-none">Paciente escribiendo...</div>
+        </div>
+        <div class="modal-footer">
+          <div class="input-group">
+            <input type="text" id="inputMensaje" class="form-control" placeholder="Escribe un mensaje..." autocomplete="off">
+            <button class="btn btn-primary" id="btnEnviar">Enviar</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- SONIDO DE NOTIFICACIÓN -->
+  <audio id="notificationSound" src="RECURSOS/noti.wav" preload="auto"></audio>
+
+  <script src="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js"></script>
+
+  <script type="module">
+    import { auth, db } from './SCRIPT/firebase-init.js';
+    import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/12.7.0/firebase-auth.js";
+    import { 
+      collection, onSnapshot, query, where, orderBy, doc, getDoc, addDoc, serverTimestamp, updateDoc, deleteField 
+    } from "https://www.gstatic.com/firebasejs/12.7.0/firebase-firestore.js";
+    import { showCustomAlert, showCustomConfirm } from './SCRIPT/utils.js';
+
+    const alertasLista = document.getElementById('alertas-lista');
+    const loadingDiv = document.getElementById('loading');
+    const mapaDiv = document.getElementById('mapa');
+    let mapa = null;
+    let marcadores = [];
+
+    let alertaIdActual = null;
+    let unsubscribeChat = null;
+    let unsubscribeTyping = null;
+    let typingTimeout = null;
+    const notificationSound = document.getElementById('notificationSound');
+
+    let voluntarioActual = null;
+    let alertasAsignadasPrevias = new Set();
+
+    
+
+    function initMapa() {
+      mapa = L.map(mapaDiv).setView([10.9878, -74.7889], 12);
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '&copy; OpenStreetMap contributors'
+      }).addTo(mapa);
+    }
+
+    window.abrirChat = function(alertaId) {
+      alertaIdActual = alertaId;
+      document.getElementById('tituloChat').innerText = "Conversar con el paciente";
+      const modal = new bootstrap.Modal(document.getElementById('modalChat'));
+      modal.show();
+      cargarMensajes();
+      escucharTyping();
+    };
+
+    window.abrirMapa = function(lat, lon) {
+      const url = `https://www.google.com/maps/dir/?api=1&destination=${lat},${lon}`;
+      window.open(url, '_blank');
+    };
+
+    window.aceptarAlerta = async function(alertaId, lat, lon) {
+      showCustomConfirm('Aceptar alerta', '¿Aceptas atender esta emergencia? Serás el único voluntario asignado.', async () => {
+        try {
+          const alertaRef = doc(db, "alertas", alertaId);
+          await updateDoc(alertaRef, {
+            estado: "asignada",
+            voluntarioId: voluntarioActual.uid,
+            voluntarioNombre: voluntarioActual.nombreCompleto,
+            aceptadaTimestamp: serverTimestamp()
+          });
+
+          // Cambiar estado del voluntario a ocupado
+          await updateDoc(doc(db, "usuarios", voluntarioActual.uid), {
+            estadoVoluntario: "ocupado"
+          });
+
+          showCustomAlert('¡Alerta aceptada!', 'El paciente ha sido notificado.');
+        } catch (error) {
+          console.error("Error al aceptar alerta:", error);
+          showCustomAlert('Error', 'No se pudo aceptar la alerta. Inténtalo de nuevo.');
+        }
+      });
+    };
+
+    window.abandonarAlerta = async function(alertaId) {
+      showCustomConfirm('Abandonar alerta', '¿Estás seguro de abandonar esta emergencia? Se liberará para otros voluntarios.', async () => {
+        try {
+          const alertaRef = doc(db, "alertas", alertaId);
+          await updateDoc(alertaRef, {
+            estado: "activa",
+            voluntarioId: deleteField(),
+            voluntarioNombre: deleteField(),
+            aceptadaTimestamp: deleteField()
+          });
+
+          // Volver a disponible
+          await updateDoc(doc(db, "usuarios", voluntarioActual.uid), {
+            estadoVoluntario: "disponible"
+          });
+
+          showCustomAlert('Alerta abandonada', 'La alerta ahora está disponible para otros voluntarios.');
+        } catch (error) {
+          console.error("Error al abandonar alerta:", error);
+          showCustomAlert('Error', 'No se pudo abandonar la alerta. Intenta de nuevo.');
+        }
+      });
+    };
+
+    window.mostrarMasInfo = function(nombre, celular) {
+      showCustomAlert('Información del paciente', `Nombre: ${nombre}\nCelular: ${celular}`);
+    };
+
+    function cargarMensajes() {
+      if (!alertaIdActual) return;
+      if (unsubscribeChat) unsubscribeChat();
+
+      let lastMessageCount = 0;
+
+      const q = query(collection(db, "alertas", alertaIdActual, "mensajes"), orderBy("timestamp"));
+
+      unsubscribeChat = onSnapshot(q, (snapshot) => {
+        const chatBody = document.getElementById('chatBody');
+        chatBody.innerHTML = snapshot.empty ? 
+          '<div class="text-center text-muted py-5" id="sinMensajes">Esperando mensajes...</div>' : '';
+
+        snapshot.forEach((docSnap) => {
+          const msg = docSnap.data();
+          const div = document.createElement('div');
+          div.className = `mb-3 ${msg.esVoluntario ? 'text-start' : 'text-end'}`;
+          div.innerHTML = `
+            <div class="d-inline-block p-3 rounded ${msg.esVoluntario ? 'bg-primary text-white' : 'bg-light'}"
+                 style="max-width: 80%; border-radius: 18px;">
+              <small class="d-block opacity-75">${msg.esVoluntario ? 'Tú (Voluntario)' : 'Paciente'}</small>
+              <p class="mb-1">${msg.texto}</p>
+              <small class="d-block mt-1 opacity-75" style="font-size: 0.7em;">
+                ${msg.timestamp?.toDate()?.toLocaleTimeString('es-CO') || 'Enviando...'}
+              </small>
+            </div>
+          `;
+          chatBody.appendChild(div);
+        });
+
+        chatBody.scrollTop = chatBody.scrollHeight;
+
+        if (snapshot.size > lastMessageCount) {
+          const newMsg = snapshot.docs[snapshot.size - 1].data();
+          if (!newMsg.esVoluntario) {
+            notificationSound.play().catch(() => {});
+          }
+          lastMessageCount = snapshot.size;
+        }
+      });
+    }
+
+    function escucharTyping() {
+      if (!alertaIdActual) return;
+      if (unsubscribeTyping) unsubscribeTyping();
+
+      const alertaRef = doc(db, "alertas", alertaIdActual);
+
+      unsubscribeTyping = onSnapshot(alertaRef, (snap) => {
+        const data = snap.data() || {};
+        const indicator = document.getElementById('typingIndicator');
+        if (data.isTypingPaciente) {
+          indicator.classList.remove('d-none');
+          indicator.innerText = "Paciente escribiendo...";
+        } else {
+          indicator.classList.add('d-none');
+        }
+      });
+    }
+
+    document.getElementById('inputMensaje')?.addEventListener('input', () => {
+      if (!alertaIdActual) return;
+      clearTimeout(typingTimeout);
+      updateDoc(doc(db, "alertas", alertaIdActual), { isTypingVoluntario: true });
+      typingTimeout = setTimeout(() => {
+        updateDoc(doc(db, "alertas", alertaIdActual), { isTypingVoluntario: deleteField() });
+      }, 3000);
+    });
+
+    document.getElementById('btnEnviar')?.addEventListener('click', enviarMensaje);
+    document.getElementById('inputMensaje')?.addEventListener('keypress', (e) => {
+      if (e.key === 'Enter') enviarMensaje();
+    });
+
+    async function enviarMensaje() {
+      const input = document.getElementById('inputMensaje');
+      const texto = input.value.trim();
+      if (!texto || !alertaIdActual) return;
+
+      try {
+        await addDoc(collection(db, "alertas", alertaIdActual, "mensajes"), {
+          texto,
+          esVoluntario: true,
+          timestamp: serverTimestamp()
+        });
+        input.value = '';
+        updateDoc(doc(db, "alertas", alertaIdActual), { isTypingVoluntario: deleteField() });
+      } catch (error) {
+        showCustomAlert('Error', 'Error al enviar mensaje');
+        console.error(error);
+      }
+    }
+
+    onAuthStateChanged(auth, async (user) => {
+      if (!user) {
+        showCustomAlert('Acceso denegado', 'Debes iniciar sesión');
+        setTimeout(() => window.location.href = 'login.html', 2000);
+        return;
+      }
+
+      const usuarioSnap = await getDoc(doc(db, "usuarios", user.uid));
+      if (!usuarioSnap.exists() || !usuarioSnap.data().esVoluntario) {
+        showCustomAlert('Acceso denegado', 'Solo los voluntarios pueden acceder');
+        setTimeout(() => window.location.href = 'index.html', 2000);
+        return;
+      }
+
+      const estadoVoluntario = usuarioSnap.data().estadoVoluntario || 'disponible';
+
+      if (estadoVoluntario === 'no_disponible') {
+        loadingDiv.style.display = 'none';
+        alertasLista.style.display = 'block';
+        alertasLista.innerHTML = `
+          <div class="col-12 text-center py-5">
+            <h4 class="text-muted fw-bold">Modo No disponible</h4>
+            <p class="subtitle text-muted">Cambia tu estado en el perfil para recibir alertas.</p>
+          </div>
+        `;
+        return;
+      }
+
+      voluntarioActual = {
+        uid: user.uid,
+        nombreCompleto: [
+          usuarioSnap.data().primerNombre || '',
+          usuarioSnap.data().segundoNombre || '',
+          usuarioSnap.data().primerApellido || '',
+          usuarioSnap.data().segundoApellido || ''
+        ].filter(Boolean).join(" ").trim(),
+        estadoVoluntario: estadoVoluntario
+      };
+
+      // Actualizar navbar con nombre del voluntario
+      document.getElementById('voluntarioNombre').innerText = voluntarioActual.nombreCompleto || 'Voluntario';
+
+      // Navbar actualizado: nombre y contador (botones de estado/centrar removidos)
+
+      initMapa();
+      loadingDiv.style.display = 'none';
+      alertasLista.style.display = 'flex';
+
+      const q = query(
+        collection(db, "alertas"),
+        where("estado", "in", ["activa", "asignada"]),
+        orderBy("timestamp", "desc")
+      );
+
+      onSnapshot(q, async (snapshot) => {
+        alertasLista.innerHTML = '';
+        marcadores.forEach(m => mapa.removeLayer(m));
+        marcadores = [];
+
+        const alertasAsignadasActuales = new Set();
+
+        let tieneAlertaAsignada = false;
+        let alertasSinAsignar = 0;
+        snapshot.forEach((docSnap) => {
+          const alerta = docSnap.data();
+          if (alerta.estado === "asignada" && alerta.voluntarioId === voluntarioActual.uid) {
+            tieneAlertaAsignada = true;
+            alertasAsignadasActuales.add(docSnap.id);
+          } else if (alerta.estado === "activa") {
+            alertasSinAsignar++;
+          }
+        });
+
+        // Actualizar contador en navbar
+        document.getElementById('contadorAlertas').innerText = alertasSinAsignar;
+
+        // Si aceptó una alerta y no estaba en ocupado, ponerlo en ocupado
+        if (tieneAlertaAsignada && voluntarioActual.estadoVoluntario !== 'ocupado') {
+          await updateDoc(doc(db, "usuarios", voluntarioActual.uid), { estadoVoluntario: "ocupado" });
+        }
+
+        // Detectar cancelaciones/eliminaciones
+        const changes = snapshot.docChanges();
+        for (const change of changes) {
+          if (change.type === 'removed' && alertasAsignadasPrevias.has(change.doc.id)) {
+            notificationSound.play().catch(() => {});
+            showCustomAlert('Emergencia cancelada', 'La emergencia que habías aceptado fue cancelada por el paciente.');
+            await updateDoc(doc(db, "usuarios", voluntarioActual.uid), { estadoVoluntario: "disponible" });
+          }
+        }
+
+        // Detección adicional
+        for (const idAnterior of alertasAsignadasPrevias) {
+          if (!alertasAsignadasActuales.has(idAnterior)) {
+            notificationSound.play().catch(() => {});
+            showCustomAlert('Emergencia cancelada', 'La emergencia fue cancelada por el paciente.');
+            await updateDoc(doc(db, "usuarios", voluntarioActual.uid), { estadoVoluntario: "disponible" });
+          }
+        }
+
+        alertasAsignadasPrevias = new Set(alertasAsignadasActuales);
+
+        if (snapshot.empty) {
+          alertasLista.innerHTML = `
+            <div class="col-12 text-center py-5">
+              <img src="RECURSOS/conectado.png" width="80" class="mb-4 opacity-75">
+              <h4 class="text-success fw-bold">¡Todo en calma!</h4>
+              <p class="subtitle text-muted">
+                No hay alertas activas en este momento.<br>
+                Gracias por estar disponible para ayudar cuando más se necesita.
+              </p>
+            </div>
+          `;
+        }
+
+        for (const docSnap of snapshot.docs) {
+          const alerta = docSnap.data();
+          const alertaId = docSnap.id;
+
+          let nombreCompleto = "Anónimo";
+          let celular = "No disponible";
+
+          if (alerta.usuarioId) {
+            const usuarioSnap = await getDoc(doc(db, "usuarios", alerta.usuarioId));
+            if (usuarioSnap.exists()) {
+              const u = usuarioSnap.data();
+              nombreCompleto = [u.primerNombre, u.segundoNombre, u.primerApellido, u.segundoApellido]
+                .filter(Boolean).join(" ").trim() || "Anónimo";
+              celular = u.celular || "No disponible";
+            }
+          }
+
+          const esAsignada = alerta.estado === "asignada";
+          const asignadaAVoluntarioActual = esAsignada && alerta.voluntarioId === voluntarioActual.uid;
+
+          const card = document.createElement('div');
+          card.className = 'col-md-6 col-lg-4 mb-4';
+          card.innerHTML = `
+            <div class="card h-100 shadow-lg border-0 ${esAsignada && !asignadaAVoluntarioActual ? 'border-secondary opacity-75' : 'border-start border-danger border-5'}">
+              <div class="card-body">
+                <h5 class="card-title ${esAsignada && !asignadaAVoluntarioActual ? 'text-secondary' : 'text-danger'} fw-bold">
+                  ${esAsignada && !asignadaAVoluntarioActual ? '⚠️ Ya respondida' : '🚨 Emergencia Activa'}
+                </h5>
+                <p class="mb-2"><strong>Paciente:</strong> ${nombreCompleto}</p>
+                <p class="mb-2"><strong>Celular:</strong> ${celular}</p>
+                <p class="mb-2"><strong>Ubicación:</strong> ${alerta.latitud.toFixed(5)}, ${alerta.longitud.toFixed(5)}</p>
+                <p class="mb-3 text-muted small">
+                  <strong>Hora:</strong> ${alerta.timestamp ? new Date(alerta.timestamp.toDate()).toLocaleString('es-CO') : 'Reciente'}
+                </p>
+                ${esAsignada && !asignadaAVoluntarioActual ? 
+                  '<p class="text-muted fw-bold text-center">Esta señal ya ha sido respondida por otro voluntario</p>' :
+                  (asignadaAVoluntarioActual ? 
+                    `<div class="d-grid gap-2">
+                      <button class="btn btn-success fw-bold btn-navegar" data-lat="${alerta.latitud}" data-lon="${alerta.longitud}">
+                        Navegar al paciente
+                      </button>
+                      <button class="btn btn-primary fw-bold btn-chat" data-id="${alertaId}">
+                        💬 Chatear con el paciente
+                      </button>
+                      <button class="btn btn-warning fw-bold btn-abandonar" data-id="${alertaId}">
+                        Abandonar alerta
+                      </button>
+                    </div>` :
+                    `<div class="d-grid gap-2">
+                      <button class="btn btn-danger fw-bold btn-aceptar" data-id="${alertaId}" data-lat="${alerta.latitud}" data-lon="${alerta.longitud}" ${tieneAlertaAsignada ? 'disabled title="Ya tienes una alerta asignada"' : ''}>
+                        Aceptar alerta
+                      </button>
+                      <button class="btn btn-outline-info fw-bold btn-masinfo" data-nombre="${nombreCompleto}" data-celular="${celular}">
+                        Más información
+                      </button>
+                    </div>`
+                  )
+                }
+              </div>
+            </div>
+          `;
+          alertasLista.appendChild(card);
+
+          const marker = L.marker([alerta.latitud, alerta.longitud])
+            .addTo(mapa)
+            .bindPopup(`
+              <b ${esAsignada && !asignadaAVoluntarioActual ? 'class="text-secondary"' : 'class="text-danger"'}>${esAsignada && !asignadaAVoluntarioActual ? '⚠️ Ya respondida' : '¡Emergencia activa!'}</b><br>
+              <strong>Paciente:</strong> ${nombreCompleto}<br>
+              <strong>Celular:</strong> ${celular}
+            `);
+
+          marcadores.push(marker);
+        }
+
+        // Eventos de botones
+        document.querySelectorAll('.btn-aceptar').forEach(btn => {
+          btn.addEventListener('click', () => {
+            aceptarAlerta(btn.dataset.id, btn.dataset.lat, btn.dataset.lon);
+          });
+        });
+
+        document.querySelectorAll('.btn-masinfo').forEach(btn => {
+          btn.addEventListener('click', () => {
+            mostrarMasInfo(btn.dataset.nombre, btn.dataset.celular);
+          });
+        });
+
+        document.querySelectorAll('.btn-navegar').forEach(btn => {
+          btn.addEventListener('click', () => {
+            abrirMapa(btn.dataset.lat, btn.dataset.lon);
+          });
+        });
+
+        document.querySelectorAll('.btn-chat').forEach(btn => {
+          btn.addEventListener('click', () => {
+            abrirChat(btn.dataset.id);
+          });
+        });
+
+        document.querySelectorAll('.btn-abandonar').forEach(btn => {
+          btn.addEventListener('click', () => {
+            abandonarAlerta(btn.dataset.id);
+          });
+        });
+
+        if (marcadores.length > 0) {
+          const group = new L.featureGroup(marcadores);
+          mapa.fitBounds(group.getBounds().pad(0.3));
+        }
+      });
+    });
+  </script>
+
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/js/bootstrap.bundle.min.js"></script>
+
+  <footer class="site-footer">
+    <p>No reemplazamos ambulancias, las complementamos con ayuda ciudadana.</p>
+    <p>&copy; 2025 VidaLink. All rights reserved.</p>
+  </footer>
+</body>
+</html>

@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Iniciar Sesión - VidaLink</title>
+    <link rel="icon" type="image/png" href="RECURSOS/vidalink.png">
+    <link rel="stylesheet" href="CSS/styles.css">
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700;800&display=swap" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/css/bootstrap.min.css" rel="stylesheet">
+</head>
+<body class="page-transition">
+    <!-- LOADER GLOBAL -->
+    <div id="vidalink-loader">
+        <div class="loader-spinner"></div>
+        <img src="RECURSOS/vidalink.png" width="80" alt="VidaLink">
+    </div>
+
+    <div class="auth-page-bg">
+        <div class="auth-container">
+            <div class="auth-content">
+                <!-- Columna Izquierda -->
+                <div class="auth-left">
+                    <h1>Bienvenido a VidaLink</h1>
+                    <p>Tu plataforma confiable para emergencias médicas. Conecta con voluntarios certificados en cuestión de segundos.</p>
+                    <ul class="auth-benefits">
+                        <li>Respuesta rápida en emergencias</li>
+                        <li>Voluntarios certificados y verificados</li>
+                        <li>Ubicación compartida en tiempo real</li>
+                        <li>Chat directo con el rescatista</li>
+                    </ul>
+                </div>
+
+                <!-- Columna Derecha (Formulario) -->
+                <div class="auth-card">
+                    <img src="RECURSOS/vidalink.png" alt="VidaLink Logo" class="auth-logo">
+                    <h2 class="auth-title">Iniciar Sesión</h2>
+                    <p class="auth-subtitle">Accede para activar emergencias y ayudar a salvar vidas</p>
+
+                    <form id="form-login">
+                        <div class="mb-4">
+                            <label for="email" class="form-label-auth">Correo electrónico</label>
+                            <input type="email" id="email" class="form-control form-control-auth" placeholder="tu@email.com" required>
+                        </div>
+
+                        <div class="mb-4">
+                            <label for="password" class="form-label-auth">Contraseña</label>
+                            <input type="password" id="password" class="form-control form-control-auth" placeholder="••••••••" required>
+                        </div>
+
+                        <button type="submit" class="btn btn-danger btn-auth w-100">
+                            <span class="spinner-border spinner-border-sm d-none me-2" id="btnSpinner"></span>
+                            Entrar
+                        </button>
+
+                        <div class="auth-divider">O continúa con</div>
+
+                        <button type="button" id="btnGoogle" class="btn btn-google w-100">
+                            <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" alt="Google" width="20">
+                            Continuar con Google
+                        </button>
+                    </form>
+
+                    <div class="auth-footer-text">
+                        ¿No tienes cuenta? <a href="registro.html" class="auth-link">Regístrate aquí</a>
+                    </div>
+                    <div class="text-center mt-3">
+                        <a href="index.html" class="back-link">← Volver al inicio</a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script type="module">
+      import { auth, db } from './SCRIPT/firebase-init.js';
+      import { iniciarSesion, iniciarSesionConGoogle } from './SCRIPT/auth.js';
+      import { doc, getDoc } from "https://www.gstatic.com/firebasejs/12.7.0/firebase-firestore.js";
+      import { showCustomAlert } from './SCRIPT/utils.js';
+
+      async function redirigirSegunPerfil(user) {
+        if (!user) return;
+        try {
+          const docRef = doc(db, "usuarios", user.uid);
+          const docSnap = await getDoc(docRef);
+          if (docSnap.exists() && docSnap.data().esVoluntario) {
+            window.location.replace('voluntarios.html');
+          } else {
+            window.location.replace('index.html');
+          }
+        } catch (error) {
+          console.error("Error al verificar perfil:", error);
+          window.location.replace('index.html');
+        }
+      }
+
+      auth.onAuthStateChanged(async (user) => {
+        if (user) {
+          await redirigirSegunPerfil(user);
+        } else {
+          const loader = document.getElementById('vidalink-loader');
+          if (loader) {
+            loader.classList.add('fade-out');
+            setTimeout(() => loader.remove(), 400);
+          }
+        }
+      });
+
+      document.getElementById('form-login').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const email = document.getElementById('email').value.trim();
+        const password = document.getElementById('password').value;
+        const btnSubmit = e.target.querySelector('button[type="submit"]');
+        const spinner = btnSubmit.querySelector('.spinner-border');
+        
+        btnSubmit.disabled = true;
+        spinner.classList.remove('d-none');
+
+        const resultado = await iniciarSesion(email, password);
+        
+        if (!resultado.success) {
+          btnSubmit.disabled = false;
+          spinner.classList.add('d-none');
+
+          if (resultado.usuarioNoExiste) {
+            showCustomAlert(
+              'Usuario no encontrado',
+              'No encontramos una cuenta con este correo electrónico. ¿Te gustaría crear una nueva cuenta?',
+              [
+                { 
+                  text: 'Crear Cuenta',
+                  className: 'btn btn-danger px-4',
+                  action: () => { window.location.href = 'registro.html'; } 
+                },
+                { 
+                  text: 'Cancelar',
+                  className: 'btn btn-secondary px-4',
+                  action: () => {} 
+                }
+              ]
+            );
+          } else if (!resultado.credential) {
+            showCustomAlert(
+              '❌ Credenciales Inválidas',
+              'El correo o la contraseña que ingresaste son incorrectos. ¿No tienes cuenta aún? Crea una nueva.',
+              [
+                { 
+                  text: 'Crear Cuenta',
+                  className: 'btn btn-danger px-4',
+                  action: () => { window.location.href = 'registro.html'; } 
+                },
+                { 
+                  text: 'Reintentar',
+                  className: 'btn btn-secondary px-4',
+                  action: () => {} 
+                }
+              ]
+            );
+          } else {
+            showCustomAlert('Error', resultado.message || 'Ocurrió un error inesperado');
+          }
+        }
+      });
+
+      document.getElementById('btnGoogle')?.addEventListener('click', async () => {
+        const btn = document.getElementById('btnGoogle');
+        btn.disabled = true;
+        btn.textContent = 'Cargando...';
+
+        const resultado = await iniciarSesionConGoogle();
+        
+        if (!resultado.success) {
+          btn.disabled = false;
+          btn.innerHTML = '<img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" alt="Google" width="20"> Continuar con Google';
+          showCustomAlert('Error con Google', resultado.error || 'No se pudo iniciar sesión con Google');
+        } else if (resultado.nuevoUsuario) {
+          // Usuario nuevo - guardar datos temporales y redirigir a completar perfil
+          sessionStorage.setItem('googleUser', JSON.stringify(resultado.user));
+          window.location.href = 'completar-perfil-google.html';
+        }
+        // Si no es nuevo usuario, el onAuthStateChanged redirige automáticamente
+      });
+    </script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/js/bootstrap.bundle.min.js"></script>
+  </body>
+</html>
