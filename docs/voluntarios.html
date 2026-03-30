@@ -198,27 +198,53 @@
       window.open(url, '_blank');
     };
 
-    window.aceptarAlerta = async function(alertaId, lat, lon) {
-      showCustomConfirm('Aceptar alerta', '¿Aceptas atender esta emergencia? Serás el único voluntario asignado.', async () => {
-        try {
-          const alertaRef = doc(db, "alertas", alertaId);
-          await updateDoc(alertaRef, {
-            estado: "asignada",
-            voluntarioId: voluntarioActual.uid,
-            voluntarioNombre: voluntarioActual.nombreCompleto,
-            aceptadaTimestamp: serverTimestamp()
+    window.aceptarAlerta = async function(id) {
+      // 1. Leemos la sesión directamente en el momento del clic
+      const currentUser = auth.currentUser;
+
+      if (!currentUser) {
+          showCustomAlert('Error', 'No se detectó tu sesión. Por favor, recarga la página.');
+          return;
+      }
+
+      try {
+          // 2. Traemos sus datos frescos desde la base de datos (Compatible con Android y Web)
+          const volSnap = await getDoc(doc(db, "usuarios", currentUser.uid));
+          
+          if (!volSnap.exists()) {
+              showCustomAlert('Error', 'No se encontró tu perfil de usuario.');
+              return;
+          }
+
+          const vData = volSnap.data();
+
+          // Candado de seguridad extra: verificar en el momento del clic
+          if (vData.verificado !== true) {
+              showCustomAlert('Acceso Denegado', 'Tu cuenta aún está en revisión.');
+              return;
+          }
+
+          // Resuelve las diferencias de nombre entre la app de tu compañero y tu web
+          const nombreVol = vData.nombre || vData.primerNombre || "Voluntario";
+
+          // 3. Actualizamos la alerta
+          await updateDoc(doc(db, "alertas", id), {
+              estado: 'asignada',
+              voluntarioId: currentUser.uid,
+              voluntarioNombre: nombreVol
           });
-          await updateDoc(doc(db, "usuarios", voluntarioActual.uid), { estadoVoluntario: "ocupado" });
+          
+          // 4. Encendemos el GPS en tiempo real (lo que agregamos hace rato)
+          if (typeof iniciarRastreoEnVivo === 'function') {
+              iniciarRastreoEnVivo(id);
+          }
+          
+          showCustomAlert('Alerta Aceptada', 'Iniciando navegación y compartiendo tu ubicación en vivo.');
 
-          // 🔥 NUEVO: Iniciar el rastreo en vivo de este voluntario
-          iniciarRastreoEnVivo(alertaId);
-
-          showCustomAlert('¡Alerta aceptada!', 'Iniciando navegación y compartiendo tu ubicación en vivo.');
-        } catch (error) {
-          console.error("Error al aceptar alerta:", error);
-          showCustomAlert('Error', 'No se pudo aceptar la alerta.');
-        }
-      });
+      } catch (error) {
+          console.error("Error crítico al aceptar:", error);
+          showCustomAlert('Error', 'Ocurrió un problema de conexión o seguridad. Intenta de nuevo.');
+      }
     };
 
     window.abandonarAlerta = async function(alertaId) {
