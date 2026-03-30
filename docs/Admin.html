@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Admin Panel | VidaLink</title>
+  <link rel="icon" type="image/png" href="RECURSOS/vidalink.png">
+  <link rel="stylesheet" href="CSS/styles.css">
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600&display=swap" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/css/bootstrap.min.css" rel="stylesheet">
+</head>
+<body class="bg-light">
+
+  <nav class="navbar navbar-compact">
+    <div class="container-fluid">
+      <a href="index.html" class="d-flex align-items-center gap-2" style="text-decoration: none;">
+        <img src="RECURSOS/logo.png" alt="VidaLink Logo" width="160" height="auto">
+      </a>
+      <div class="ms-auto">
+        <button class="btn btn-outline-secondary btn-sm" onclick="location.href='index.html'">Volver al Inicio</button>
+      </div>
+    </div>
+  </nav>
+
+  <main class="container py-5">
+    <div id="adminContent" style="display: none;">
+      <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2 class="fw-bold text-dark">Validación de Voluntarios</h2>
+        <span class="badge bg-danger p-2" id="countPendientes">0 Pendientes</span>
+      </div>
+
+      <div class="card border-0 shadow-sm" style="border-radius: 20px;">
+        <div class="table-responsive p-4">
+          <table class="table table-hover align-middle">
+            <thead class="table-light">
+              <tr>
+                <th>Nombre Completo</th>
+                <th>Correo Electrónico</th>
+                <th>Celular</th>
+                <th>Acción</th>
+              </tr>
+            </thead>
+            <tbody id="tablaVoluntarios">
+              </tbody>
+          </table>
+          <div id="noPendientes" class="text-center py-5 d-none">
+            <p class="text-muted">No hay voluntarios pendientes de verificación.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div id="deniedContent" class="text-center py-5" style="display: none;">
+        <h1 class="display-1 fw-bold text-danger">403</h1>
+        <h3 class="fw-bold">Acceso Denegado</h3>
+        <p class="text-muted">No tienes permisos de administrador.</p>
+        <a href="index.html" class="btn btn-primary px-4 mt-3">Volver al inicio</a>
+    </div>
+  </main>
+  <tbody id="tablaVoluntarios">
+  </tbody>
+
+  <script type="module">
+    import { db } from './SCRIPT/firebase-init.js';
+    import { protegerRutaPrivada } from './SCRIPT/auth.js';
+    import { 
+      collection, query, where, onSnapshot, doc, updateDoc, getDoc 
+    } from "https://www.gstatic.com/firebasejs/12.7.0/firebase-firestore.js";
+    import { showCustomAlert } from './SCRIPT/utils.js';
+
+    const tabla = document.getElementById('tablaVoluntarios');
+    const adminContent = document.getElementById('adminContent');
+    const deniedContent = document.getElementById('deniedContent');
+    const countBadge = document.getElementById('countPendientes');
+    const emptyMsg = document.getElementById('noPendientes');
+
+    // 1. Verificar si el usuario es administrador
+    protegerRutaPrivada(async (user) => {
+      const snap = await getDoc(doc(db, "usuarios", user.uid));
+      const uData = snap.data();
+
+      if (uData && uData.esAdmin === true) {
+        adminContent.style.display = 'block';
+        escucharVoluntariosPendientes();
+      } else {
+        deniedContent.style.display = 'block';
+      }
+    });
+
+    // 2. ESCUCHAR VOLUNTARIOS NO VERIFICADOS
+  function escucharVoluntariosPendientes() {
+      // Consultamos a todos los que marcaron "Soy Voluntario"
+      const q = query(
+        collection(db, "usuarios"), 
+        where("esVoluntario", "==", true)
+      );
+
+      onSnapshot(q, (snapshot) => {
+        tabla.innerHTML = '';
+        let pendientesContador = 0;
+
+        snapshot.forEach(docSnap => {
+          const v = docSnap.data();
+          
+          // FILTRO MANUAL: Solo mostramos si NO está verificado (false o no existe)
+          if (v.verificado === true) return; 
+
+          pendientesContador++;
+          const id = docSnap.id;
+          const nombre = `${v.primerNombre} ${v.primerApellido}`;
+
+          const tr = document.createElement('tr');
+          tr.innerHTML = `
+            <td>
+              <div class="fw-bold">${nombre}</div>
+              <small class="text-muted">${v.email}</small>
+            </td>
+            <td>${v.email}</td>
+            <td>${v.celular}</td>
+            <td>
+              <div class="btn-group">
+                <button class="btn btn-success btn-sm fw-bold btn-verificar" data-id="${id}">
+                  APROBAR
+                </button>
+                <button class="btn btn-outline-danger btn-sm fw-bold btn-rechazar" data-id="${id}">
+                  RECHAZAR
+                </button>
+              </div>
+            </td>
+          `;
+          tabla.appendChild(tr);
+        });
+
+        countBadge.innerText = `${pendientesContador} Pendientes`;
+        
+        if (pendientesContador === 0) {
+          emptyMsg.classList.remove('d-none');
+        } else {
+          emptyMsg.classList.add('d-none');
+        }
+
+        // Re-asignar eventos
+        document.querySelectorAll('.btn-verificar').forEach(btn => {
+          btn.onclick = () => verificarVoluntario(btn.dataset.id);
+        });
+        document.querySelectorAll('.btn-rechazar').forEach(btn => {
+          btn.onclick = () => rechazarVoluntario(btn.dataset.id);
+        });
+      });
+    }
+
+  // FUNCIÓN PARA RECHAZAR (Quita el rango de voluntario)
+  async function rechazarVoluntario(userId) {
+    showCustomConfirm('Rechazar Voluntario', '¿Estás seguro de denegar esta solicitud? El usuario dejará de ser considerado voluntario.', async () => {
+      try {
+        await updateDoc(doc(db, "usuarios", userId), {
+          esVoluntario: false,
+          estadoVoluntario: 'rechazado',
+          verificado: false
+        });
+        showCustomAlert('Solicitud Rechazada', 'El usuario ha sido notificado implícitamente al perder acceso al panel.');
+      } catch (error) {
+        showCustomAlert('Error', 'No se pudo procesar la solicitud.');
+      }
+    });
+  }
+
+    // 3. Función para aprobar al voluntario
+    async function verificarVoluntario(userId) {
+      try {
+        await updateDoc(doc(db, "usuarios", userId), {
+          verificado: true,
+          estadoVoluntario: 'disponible'
+        });
+        showCustomAlert('¡Aprobado!', 'El voluntario ahora puede atender emergencias.');
+      } catch (error) {
+        showCustomAlert('Error', 'No se pudo completar la verificación.');
+      }
+    }
+  </script>
+
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

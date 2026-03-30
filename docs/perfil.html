@@ -52,6 +52,15 @@
 
             <div class="col-12 col-md-8 p-4">
               <div class="card-body px-0">
+
+                <div id="statsVoluntario" class="card shadow-sm border-0 mb-4 d-none" style="border-radius: 15px; background: linear-gradient(135deg, #fff, #f8f9fa);">
+                  <div class="card-body text-center py-4">
+                    <h5 class="fw-bold text-success mb-3"><i class="bi bi-star-fill text-warning"></i> Vidas Impactadas</h5>
+                    <h1 id="contadorAyudas" class="display-2 fw-bold text-danger">0</h1>
+                    <p class="text-muted mb-0">Emergencias atendidas exitosamente</p>
+                  </div>
+                </div>
+
                 <form id="formPerfil">
                   <div class="row g-3">
                     <div class="col-12">
@@ -104,6 +113,47 @@
                         <span id="estadoBadge" class="align-self-center small text-muted"></span>
                       </div>
                     </div>
+                    
+                      <hr class="my-4">
+                      <h4 class="mb-3 text-danger">Ficha Médica de Emergencia</h4>
+
+                      <div class="row g-3">
+                        <div class="col-md-4">
+                          <label class="form-label small fw-bold">Tipo de Sangre</label>
+                          <select id="tipoSangre" class="form-select">
+                            <option value="">Selecciona...</option>
+                            <option value="O+">O+</option>
+                            <option value="O-">O-</option>
+                            <option value="A+">A+</option>
+                            <option value="A-">A-</option>
+                            <option value="B+">B+</option>
+                            <option value="B-">B-</option>
+                            <option value="AB+">AB+</option>
+                            <option value="AB-">AB-</option>
+                          </select>
+                        </div>
+                      
+                        <div class="col-md-8">
+                          <label class="form-label small fw-bold">Alergias (Medicamentos/Alimentos)</label>
+                          <input type="text" id="alergias" class="form-control" placeholder="Ej: Amoxicilina, Maní...">
+                        </div>
+
+                        <div class="col-12 mt-3">
+                          <div class="form-check form-switch">
+                            <input class="form-check-input" type="checkbox" id="tieneDiscapacidad">
+                            <label class="form-check-label fw-bold" for="tieneDiscapacidad">¿Posee alguna discapacidad?</label>
+                          </div>
+                          <input type="text" id="detalleDiscapacidad" class="form-control mt-2 d-none" placeholder="¿Cuál? (Ej: Visual, auditiva...)">
+                        </div>
+
+                        <div class="col-12 mt-3">
+                          <div class="form-check form-switch">
+                            <input class="form-check-input" type="checkbox" id="tieneProtesis">
+                            <label class="form-check-label fw-bold" for="tieneProtesis">¿Utiliza alguna prótesis?</label>
+                          </div>
+                          <input type="text" id="detalleProtesis" class="form-control mt-2 d-none" placeholder="¿En qué parte del cuerpo?">
+                        </div>
+                      </div>
 
                     <div class="col-12 mt-4">
                       <div class="d-grid">
@@ -124,7 +174,7 @@
   <script type="module">
   import { db } from './SCRIPT/firebase-init.js';
   import { protegerRutaPrivada, cerrarSesion } from './SCRIPT/auth.js';
-  import { doc, getDoc, updateDoc } from "https://www.gstatic.com/firebasejs/12.7.0/firebase-firestore.js";
+  import { doc, getDoc, updateDoc, query, collection, where, getDocs } from "https://www.gstatic.com/firebasejs/12.7.0/firebase-firestore.js";
   import { showCustomAlert } from './SCRIPT/utils.js';
 
   window.cerrarSesion = async () => {
@@ -144,7 +194,17 @@
     document.getElementById('segundoApellido').value = data.segundoApellido || '';
     document.getElementById('celular').value = data.celular || '';
     document.getElementById('esVoluntario').checked = data.esVoluntario || false;
-    
+
+    // Ficha médica de emergencia
+    document.getElementById('tipoSangre').value = data.tipoSangre || '';
+    document.getElementById('alergias').value = data.alergias === 'Ninguna' ? '' : (data.alergias || '');
+    document.getElementById('tieneDiscapacidad').checked = data.tieneDiscapacidad || false;
+    document.getElementById('detalleDiscapacidad').value = data.detalleDiscapacidad || '';
+    document.getElementById('detalleDiscapacidad').classList.toggle('d-none', !document.getElementById('tieneDiscapacidad').checked);
+    document.getElementById('tieneProtesis').checked = data.tieneProtesis || false;
+    document.getElementById('detalleProtesis').value = data.detalleProtesis || '';
+    document.getElementById('detalleProtesis').classList.toggle('d-none', !document.getElementById('tieneProtesis').checked);
+
     // Inyectar datos en el display
     document.getElementById('emailDisplay').textContent = user.email;
     const nombreCompleto = [data.primerNombre, data.primerApellido].filter(Boolean).join(' ') || 'Usuario VidaLink';
@@ -209,16 +269,44 @@
       }
     }
 
+    const statsVoluntario = document.getElementById('statsVoluntario');
+    const contadorAyudasEl = document.getElementById('contadorAyudas');
+
     if (data.esVoluntario) {
       section.style.display = 'block';
       badge.style.display = 'block';
+      statsVoluntario.classList.remove('d-none');
       actualizarBotonEstado();
+
+      const qAyudas = query(
+        collection(db, 'alertas'),
+        where('voluntarioId', '==', user.uid),
+        where('estado', '==', 'finalizada')
+      );
+
+      getDocs(qAyudas)
+        .then(snapshot => {
+          contadorAyudasEl.innerText = snapshot.size;
+        })
+        .catch(e => {
+          console.error('Error cargando historial', e);
+          contadorAyudasEl.innerText = '0';
+        });
+    } else {
+      statsVoluntario.classList.add('d-none');
     }
 
     document.getElementById('esVoluntario').onchange = (e) => {
       section.style.display = e.target.checked ? 'block' : 'none';
       badge.style.display = e.target.checked ? 'block' : 'none';
       if (e.target.checked) actualizarBotonEstado();
+    };
+
+    document.getElementById('tieneDiscapacidad').onchange = (e) => {
+      document.getElementById('detalleDiscapacidad').classList.toggle('d-none', !e.target.checked);
+    };
+    document.getElementById('tieneProtesis').onchange = (e) => {
+      document.getElementById('detalleProtesis').classList.toggle('d-none', !e.target.checked);
     };
 
     toggleBtn.onclick = async () => {
@@ -234,14 +322,38 @@
       btnSubmit.disabled = true;
       btnSubmit.textContent = 'Guardando cambios...';
 
+      const esVoluntarioCheck = document.getElementById('esVoluntario').checked;
+
       const datos = {
         primerNombre: document.getElementById('primerNombre').value.trim(),
         segundoNombre: document.getElementById('segundoNombre').value.trim() || null,
         primerApellido: document.getElementById('primerApellido').value.trim(),
         segundoApellido: document.getElementById('segundoApellido').value.trim() || null,
         celular: document.getElementById('celular').value.trim(),
-        esVoluntario: document.getElementById('esVoluntario').checked
+        tipoSangre: document.getElementById('tipoSangre').value,
+        alergias: document.getElementById('alergias').value.trim() || 'Ninguna',
+        tieneDiscapacidad: document.getElementById('tieneDiscapacidad').checked,
+        detalleDiscapacidad: document.getElementById('detalleDiscapacidad').value.trim(),
+        tieneProtesis: document.getElementById('tieneProtesis').checked,
+        detalleProtesis: document.getElementById('detalleProtesis').value.trim(),
+        esVoluntario: esVoluntarioCheck,
+        setupComplete: true
       };
+
+      // AGREGADO: Si el usuario marcó que quiere ser voluntario, 
+      // nos aseguramos de que entre en estado de "espera de verificación"
+      if (esVoluntarioCheck) {
+        // Solo lo ponemos en false si NO estaba verificado antes
+        // para no quitarle el rango a alguien que ya es voluntario oficial
+        if (data.verificado !== true) {
+          datos.verificado = false;
+          datos.estadoVoluntario = 'pendiente';
+        }
+      } else {
+        // Si desmarca la casilla, le quitamos todo
+        datos.verificado = false;
+        datos.estadoVoluntario = 'no_aplicable';
+      }
 
       try {
         await updateDoc(usuarioRef, datos);
@@ -262,7 +374,7 @@
 
   <footer class="site-footer">
     <p>VidaLink: Juntos salvamos vidas.</p>
-    <p>&copy; 2025 VidaLink. Colombia.</p>
+    <p>&copy; 2026 VidaLink. Colombia.</p>
   </footer>
 </body>
 </html>

@@ -161,3 +161,48 @@ function anteriorPaso() {
   renderPaso();
 }
 
+import { db } from './firebase-init.js';
+import { doc, updateDoc } from "https://www.gstatic.com/firebasejs/12.7.0/firebase-firestore.js";
+import { manejarErrorGPS } from './utils.js';
+
+let watchID = null;
+
+document.addEventListener("DOMContentLoaded", () => {
+    let data = JSON.parse(localStorage.getItem('emergenciaActiva'));
+    if (data) {
+        iniciarRastreoEnTiempoReal(data.alertaId);
+        iniciarVista(data);
+    }
+});
+
+function iniciarRastreoEnTiempoReal(alertaId) {
+    if (!navigator.geolocation) return;
+
+    // watchPosition actualizará la base de datos cada vez que el usuario se mueva
+    watchID = navigator.geolocation.watchPosition(
+        async (pos) => {
+            const lat = pos.coords.latitude;
+            const lon = pos.coords.longitude;
+
+            // 1. Actualizar UI local
+            const coordsEl = document.getElementById('coords');
+            if(coordsEl) coordsEl.innerText = `Lat: ${lat.toFixed(5)}, Lng: ${lon.toFixed(5)}`;
+
+            // 2. Actualizar Firebase para que los voluntarios vean el movimiento
+            try {
+                const alertaRef = doc(db, "alertas", alertaId);
+                await updateDoc(alertaRef, { lat, lon });
+                console.log("Ubicación actualizada en tiempo real");
+            } catch (error) {
+                console.error("Error actualizando ubicación:", error);
+            }
+        },
+        (err) => manejarErrorGPS(err),
+        { enableHighAccuracy: true }
+    );
+}
+
+// Asegúrate de limpiar el rastreo cuando la emergencia termine
+window.addEventListener('beforeunload', () => {
+    if (watchID) navigator.geolocation.clearWatch(watchID);
+});

@@ -45,8 +45,6 @@ export function protegerRutaPrivada(onAutenticado) {
  */
 export async function usuarioExiste(email) {
   try {
-    // Intenta iniciar sesión con una contraseña dummy para verificar si el email existe
-    // Si el email no existe, Firebase lo dirá explícitamente
     const usuarios = await fetch(
       `https://identitytoolkit.googleapis.com/v1/accounts:lookup?key=${auth.app.options.apiKey}`,
       {
@@ -55,9 +53,7 @@ export async function usuarioExiste(email) {
       }
     ).catch(() => null);
 
-    // Método alternativo: usar signInWithEmailAndPassword con manejo de errores
-    // El error "auth/user-not-found" significa que el usuario no existe
-    return true; // Este método no es 100% confiable sin credenciales
+    return true; 
   } catch (error) {
     return false;
   }
@@ -71,7 +67,6 @@ export async function iniciarSesion(email, password) {
     const userCredential = await signInWithEmailAndPassword(auth, email, password);
     return { success: true, user: userCredential.user };
   } catch (error) {
-    // Detectar si el email no existe
     if (error.code === 'auth/user-not-found') {
       return { 
         success: false, 
@@ -96,7 +91,7 @@ export async function iniciarSesion(email, password) {
 }
 
 /**
- * Registro
+ * Registro con sistema de verificación
  */
 export async function registrarse(email, password, datosPersonales = {}, esVoluntario = false) {
   try {
@@ -111,7 +106,8 @@ export async function registrarse(email, password, datosPersonales = {}, esVolun
       segundoApellido: datosPersonales.segundoApellido || '',
       celular: datosPersonales.celular || '',
       esVoluntario,
-      estadoVoluntario: esVoluntario ? 'no_disponible' : 'no_aplicable',
+      verificado: false, // Nuevo campo: requiere aprobación manual
+      estadoVoluntario: esVoluntario ? 'pendiente' : 'no_aplicable', 
       fechaRegistro: new Date()
     });
 
@@ -139,8 +135,7 @@ export async function registrarse(email, password, datosPersonales = {}, esVolun
 }
 
 /**
- * ❌ NO usar auth.currentUser directamente en Pages
- * ✅ Usar onAuthStateChanged
+ * Obtener usuario actual mediante observador
  */
 export function obtenerUsuario(callback) {
   observarEstadoAuth(user => callback(user));
@@ -152,7 +147,6 @@ export function obtenerUsuario(callback) {
 export async function cerrarSesion() {
   try {
     await signOut(auth);
-    // Se redirige en el listener de onAuthStateChanged o al llamar
     window.location.href = 'index.html'; 
   } catch (error) {
     console.error(error);
@@ -173,7 +167,6 @@ export async function iniciarSesionConGoogle() {
     const snap = await getDoc(usuarioRef);
 
     if (!snap.exists()) {
-      // Usuario nuevo - devolver info para que llene los datos
       return { 
         success: true, 
         nuevoUsuario: true,
@@ -184,9 +177,8 @@ export async function iniciarSesionConGoogle() {
         }
       };
     } else {
-        // Asegurar que el estado exista para usuarios antiguos
         const existingData = snap.data();
-        const defaultState = existingData.esVoluntario ? 'no_disponible' : 'no_aplicable';
+        const defaultState = existingData.esVoluntario ? 'pendiente' : 'no_aplicable';
 
         await updateDoc(usuarioRef, {
             estadoVoluntario: existingData.estadoVoluntario || defaultState
@@ -200,7 +192,7 @@ export async function iniciarSesionConGoogle() {
 }
 
 /**
- * Completa el perfil de un usuario Google nuevo
+ * Completa el perfil de un usuario Google nuevo con verificación
  */
 export async function completarPerfilGoogle(uid, datosPersonales, esVoluntario = false) {
   try {
@@ -214,7 +206,8 @@ export async function completarPerfilGoogle(uid, datosPersonales, esVoluntario =
       segundoApellido: datosPersonales.segundoApellido || '',
       celular: datosPersonales.celular || '',
       esVoluntario,
-      estadoVoluntario: esVoluntario ? 'no_disponible' : 'no_aplicable',
+      verificado: false, // Nuevo campo: requiere aprobación manual
+      estadoVoluntario: esVoluntario ? 'pendiente' : 'no_aplicable',
       fechaRegistro: new Date(),
       registroConGoogle: true
     });

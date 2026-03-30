@@ -518,9 +518,19 @@
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/js/bootstrap.bundle.min.js"></script>
 
+<script>
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('./sw.js')
+        .then(reg => console.log('Service Worker registrado con éxito', reg.scope))
+        .catch(err => console.error('Error al registrar Service Worker', err));
+    });
+  }
+</script>
+
 <footer class="site-footer">
   <p>No reemplazamos ambulancias, las complementamos con ayuda ciudadana.</p>
-  <p>&copy; 2025 VidaLink</p>
+  <p>&copy; 2026 VidaLink</p>
 </footer>
 </body>
 </html>

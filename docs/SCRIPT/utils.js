@@ -1,6 +1,6 @@
 // SCRIPT/utils.js
 
-export function showCustomAlert(title, message, buttons = null) {
+export function showCustomAlert(title, message, buttons = null, useHtml = false) {
   let modalEl = document.getElementById('customAlertModal');
   if (!modalEl) {
     modalEl = document.createElement('div');
@@ -14,7 +14,7 @@ export function showCustomAlert(title, message, buttons = null) {
             <h5 class="modal-title fw-bold text-danger" id="customAlertTitle">Error</h5>
           </div>
           <div class="modal-body pt-2 text-center">
-            <p id="customAlertMessage" class="text-dark mb-0 fs-5">${message || 'Mensaje'}</p>
+            <div id="customAlertMessage" class="text-dark mb-0 fs-5">${message || 'Mensaje'}</div>
           </div>
           <div class="modal-footer border-0 justify-content-center" id="customAlertFooter">
             <button type="button" class="btn btn-secondary px-4" data-bs-dismiss="modal">Cerrar</button>
@@ -26,7 +26,12 @@ export function showCustomAlert(title, message, buttons = null) {
   }
 
   document.getElementById('customAlertTitle').textContent = title;
-  document.getElementById('customAlertMessage').textContent = message;
+  const messageEl = document.getElementById('customAlertMessage');
+  if (useHtml) {
+    messageEl.innerHTML = message;
+  } else {
+    messageEl.textContent = message;
+  }
 
   const footer = document.getElementById('customAlertFooter');
   footer.innerHTML = ''; // Limpiar botones anteriores
@@ -130,4 +135,38 @@ export function showCustomConfirm(title, message, callbackYes) {
   }, { once: true });
 
   modalInstance.show();
+}
+// 1. Cálculo de Distancia (Haversine)
+export function calcularDistancia(lat1, lon1, lat2, lon2) {
+    const R = 6371; // Radio de la Tierra en km
+    const dLat = (lat2 - lat1) * Math.PI / 180;
+    const dLon = (lon2 - lon1) * Math.PI / 180;
+    const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+              Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+              Math.sin(dLon/2) * Math.sin(dLon/2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+    return R * c;
+}
+
+// 2. Guía de errores de GPS
+export function manejarErrorGPS(error) {
+    let mensaje = "No pudimos obtener tu ubicación.";
+    switch(error.code) {
+        case error.PERMISSION_DENIED:
+            mensaje = "Has denegado el permiso de ubicación. Por favor, actívalo en la configuración de tu navegador/celular.";
+            break;
+        case error.POSITION_UNAVAILABLE:
+            mensaje = "La información de ubicación no está disponible. Asegúrate de tener el GPS encendido.";
+            break;
+        case error.TIMEOUT:
+            mensaje = "Se agotó el tiempo esperando la ubicación.";
+            break;
+    }
+    
+    showCustomAlert('Error de GPS', mensaje, [
+        { text: '¿Cómo activar?', action: () => {
+            window.open('https://support.google.com/chrome/answer/142065', '_blank');
+        }},
+        { text: 'Cerrar', action: () => {} }
+    ]);
 }
